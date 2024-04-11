@@ -28,7 +28,8 @@ pub mod foo {
 
 #[test]
 #[allow(unused_imports)]
-fn mirroring() {
+// Test that the generated code mirrors the original code
+fn success() {
     use mirror::foo::bar_one::baz::Baz as BazOne;
     use mirror::foo::bar_one::BarOne;
     use mirror::foo::bar_two::baz::Baz as BazTwo;

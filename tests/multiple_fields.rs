@@ -1,19 +1,20 @@
-#[prost_unwrap::required(mirror, ["foo.bar.Bar.a"])]
+#[prost_unwrap::required(mirror, ["foo.bar.Bar.{a, b}"])]
 pub mod foo {
+    #[derive(Clone)]
     pub struct Foo {
         pub a: i32,
     }
     pub mod bar {
         pub struct Bar {
             pub a: Option<super::Foo>,
+            pub b: Option<super::Foo>,
         }
     }
 }
 
 #[test]
 #[allow(unused_imports)]
-// Test that the macro works and unwraps the required field from Option<T>,
-// leaving other fields as is
+// Test that the macro works and unwraps the required field from Option<T>
 fn success() {
     use mirror::foo::bar::Bar;
     use mirror::foo::Foo;
@@ -21,5 +22,8 @@ fn success() {
     let a = 1;
 
     let foo = Foo { a };
-    let _ = Bar { a: foo };
+    let _ = Bar {
+        a: foo.clone(),
+        b: foo.clone(),
+    };
 }

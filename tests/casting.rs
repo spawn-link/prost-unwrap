@@ -21,7 +21,8 @@ pub mod foo {
 
 #[test]
 #[allow(unused_imports)]
-fn success_casting() {
+// Test that the original struct can be try-casted to the mirror
+fn success() {
     use foo::bar::Bar as OrigBar;
     use foo::bar::Foo as OrigFoo;
     use mirror::foo::bar::Bar;
@@ -39,7 +40,9 @@ fn success_casting() {
 
 #[test]
 #[allow(unused_imports)]
-fn error_casting() {
+// Test that the original struct cannot be try-casted to the mirror if the
+// required field is missing
+fn error() {
     use foo::bar::Bar as OrigBar;
     use foo::bar::Foo as OrigFoo;
     use mirror::foo::bar::Bar;
