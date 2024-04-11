@@ -1,11 +1,14 @@
 #[prost_unwrap::required(mirror, ["foo.bar.Bar.a"])]
 pub mod foo {
+    #[derive(Clone)]
     pub struct Foo {
         pub a: i32,
     }
     pub mod bar {
         pub struct Bar {
             pub a: Option<super::Foo>,
+            pub b: Option<super::Foo>,
+            pub c: Vec<super::Foo>,
         }
     }
 }
@@ -21,5 +24,9 @@ fn success() {
     let a = 1;
 
     let foo = Foo { a };
-    let _ = Bar { a: foo };
+    let _ = Bar {
+        a: foo.clone(),
+        b: None,
+        c: vec![foo.clone()],
+    };
 }
