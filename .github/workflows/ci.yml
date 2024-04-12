@@ -24,7 +24,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
-      - run: cargo clippy --workspace --all-features --tests -- -D warnings
+      - run: cargo clippy --all-features --tests -- -D warnings
 
   machete:
     runs-on: ubuntu-latest

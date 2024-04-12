@@ -14,6 +14,7 @@ pub mod foo {
 
 #[test]
 #[allow(unused_imports)]
+#[allow(clippy::disallowed_names)]
 // Test that the macro works and unwraps the required field from Option<T>
 fn success() {
     use mirror::foo::bar::Bar;

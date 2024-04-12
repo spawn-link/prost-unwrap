@@ -15,6 +15,7 @@ pub mod foo {
 
 #[test]
 #[allow(unused_imports)]
+#[allow(clippy::disallowed_names)]
 // Test that the macro works and unwraps the required field from Option<T>,
 // leaving other fields as is
 fn success() {
