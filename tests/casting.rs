@@ -1,12 +1,12 @@
 #[prost_unwrap::required(mirror, ["foo.bar.Bar.a"])]
 pub mod foo {
     pub mod bar {
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, PartialEq, Clone)]
         pub struct Foo {
             pub a: i32,
         }
 
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, PartialEq, Clone)]
         pub struct Bar {
             pub a: Option<Foo>,
             pub b: Option<Foo>,
@@ -37,7 +37,8 @@ fn success() {
         c: vec![Foo { a }, Foo { a }],
     };
 
-    assert_eq!(sane, orig.try_into().unwrap())
+    assert_eq!(sane, orig.clone().try_into().unwrap());
+    assert_eq!(orig, sane.into());
 }
 
 #[test]
