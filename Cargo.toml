@@ -11,4 +11,4 @@ keywords = ["protobuf", "grpc", "prost", "tonic"]
 categories = ["data-structures", "rust-patterns"]
 
 [dependencies]
-prost-unwrap-transform = { path = "../prost-unwrap-transform", version = "0.1" }
+prost-unwrap-transform = "0.1.0"
