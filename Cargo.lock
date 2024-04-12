@@ -37,14 +37,14 @@ dependencies = [
 
 [[package]]
 name = "prost-unwrap"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "prost-unwrap-transform",
 ]
 
 [[package]]
 name = "prost-unwrap-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "prost-unwrap-transform"
-version = "0.1.2"
+version = "0.1.5"
 dependencies = [
  "proc-macro-error",
  "prost-unwrap-core",
