@@ -1,0 +1,18 @@
+[package]
+name = "prost-unwrap-transform"
+version = "0.1.2"
+edition = "2021"
+authors = ["Denis Farr <denis@spawnlink.eu>"]
+license = "Apache-2.0"
+repository = "https://github.com/spawn-link/prost-unwrap-transform"
+readme = "README.md"
+description = "A procedural macro container for prost-unwrap library"
+keywords = ["protobuf", "grpc", "prost", "tonic"]
+categories = ["data-structures", "rust-patterns"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro-error = "1.0"
+prost-unwrap-core = { version = "0.1.4", path = "../prost-unwrap-core" }

@@ -1,0 +1,13 @@
+tab_spaces = 4
+blank_lines_lower_bound = 0
+blank_lines_upper_bound = 1
+
+imports_granularity = "Item"
+group_imports = "StdExternalCrate"
+imports_layout = "Vertical"
+
+reorder_imports = true
+reorder_modules = true
+reorder_impl_items = true
+
+overflow_delimited_expr = true

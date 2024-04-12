@@ -10,5 +10,8 @@ description = "A procedural macro for prost-generated structs validation and typ
 keywords = ["protobuf", "grpc", "prost", "tonic"]
 categories = ["data-structures", "rust-patterns"]
 
+[workspace]
+members = ["prost-unwrap-transform", "prost-unwrap-core"]
+
 [dependencies]
-prost-unwrap-transform = "0.1.2"
+prost-unwrap-transform = { version = "0.1.2", path = "prost-unwrap-transform" }
