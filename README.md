@@ -1,3 +1,7 @@
+**NOTE:** This crate is in early stages of development and is not yet intended
+to be used in production applications. The crate API is a subject for breaking
+changes.
+
 This crate is designed to bridge the gap between gRPC's design principles and
 the idiomatic Rust approach to data structures. It automates the generation of
 "mirror" data structures that unwrap all necessary fields from `Option<T>` and

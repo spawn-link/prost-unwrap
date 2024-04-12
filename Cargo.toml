@@ -2,6 +2,13 @@
 name = "prost-unwrap"
 version = "0.1.2"
 edition = "2021"
+authors = ["Denis Farr <denis@spawnlink.eu>"]
+license = "Apache-2.0"
+repository = "https://github.com/spawn-link/prost-unwrap"
+readme = "README.md"
+description = "A procedural macro for prost-generated structs validation and type-casting"
+keywords = ["protobuf", "grpc", "prost", "tonic"]
+categories = ["data-structures", "rust-patterns"]
 
 [dependencies]
 prost-unwrap-transform = { path = "../prost-unwrap-transform", version = "0.1" }
