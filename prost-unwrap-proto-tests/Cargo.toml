@@ -9,7 +9,6 @@ path = "src/lib.rs"
 
 [dependencies]
 prost-unwrap = { path = ".." }
-prost-unwrap-transform = { path = "../prost-unwrap-transform" }
 
 [build-dependencies]
 prost-build = "0.12"

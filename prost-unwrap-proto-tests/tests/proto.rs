@@ -10,6 +10,3 @@ mod proto {
         );
     }
 }
-
-#[cfg(test)]
-fn foo() {}

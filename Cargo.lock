@@ -345,7 +345,6 @@ version = "0.0.0"
 dependencies = [
  "prost-build",
  "prost-unwrap",
- "prost-unwrap-transform",
 ]
 
 [[package]]

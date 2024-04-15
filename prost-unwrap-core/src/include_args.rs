@@ -543,6 +543,7 @@ impl IncludeArgs {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)] // remove after contents is accessed
 pub struct SourceFile {
     pub path_buf: PathBuf,
     pub contents: String,
