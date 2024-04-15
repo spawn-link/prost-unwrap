@@ -269,7 +269,7 @@ impl IncludeArgs {
 
         abort!(
             call_args,
-            "Parameter argument must be an absolute module path literal, e.g. `crate::my_module`"
+            "Parameter argument must be an absolute module path literal, e.g. `crate::proto`"
         );
     }
 
@@ -301,7 +301,7 @@ impl IncludeArgs {
         }
         abort!(
             call_args,
-            "Parameter argument must be an absolute module path literal, e.g. `crate::my_module`"
+            "Parameter argument must be an absolute module path literal, e.g. `crate::proto`"
         )
     }
 
@@ -322,9 +322,10 @@ impl IncludeArgs {
                         abort!(
                             str_lit,
                             format!(
-                                "Failed to load prost-generated rust source code from {:?}: {}",
+                                "Failed to load prost-generated rust source code from {:?}: {} (cwd: {:?})",
                                 &str_lit.value(),
-                                e.to_string()
+                                e.to_string(),
+                                std::env::current_dir().unwrap()
                             )
                         )
                     })
@@ -352,7 +353,7 @@ impl IncludeArgs {
 
         abort!(
             call_args,
-            "Parameter argument must be a path to the prost-generated rust source code"
+            "Parameter argument must be a string literal path to the prost-generated rust source code"
         )
     }
 
@@ -373,7 +374,7 @@ impl IncludeArgs {
         }
 
         if call_args.len() != 1 {
-            abort!(call_args, "Parameter must have 1 argument");
+            abort!(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -384,7 +385,7 @@ impl IncludeArgs {
 
         abort!(
             call_args,
-            "Parameter argument must be an ident literal to alter the enums and structs names"
+            "Parameter argument must be an ident literal, e.g. `Suffix`"
         )
     }
 
@@ -392,10 +393,10 @@ impl IncludeArgs {
     fn parse_struct_spec(
         include_args_builder: &mut IncludeArgsBuilder,
         call_args: &mut Punctuated<Expr, Token![,]>,
-        _expr_span: &Span,
+        expr_span: &Span,
     ) {
         if !(2..=3).contains(&call_args.len()) {
-            abort!(call_args, "Parameter must have 2 or 3 arguments: {}");
+            abort!(expr_span, "Parameter must have 2 or 3 arguments");
         }
 
         let mut call_args_iter = call_args.iter();
@@ -405,7 +406,7 @@ impl IncludeArgs {
             expr_ => {
                 abort!(
                     expr_,
-                    "Argument must be a struct relative path, e.g. `proto::MyStruct`"
+                    "Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`"
                 );
             }
         };
@@ -484,10 +485,10 @@ impl IncludeArgs {
     fn parse_enum_spec(
         include_args_builder: &mut IncludeArgsBuilder,
         call_args: &mut Punctuated<Expr, Token![,]>,
-        _expr_span: &Span,
+        expr_span: &Span,
     ) {
         if !(1..=2).contains(&call_args.len()) {
-            abort!(call_args, "Parameter must have 1 or 2 arguments");
+            abort!(expr_span, "Parameter must have 1 or 2 arguments");
         }
 
         let mut call_args_iter = call_args.iter();
@@ -497,7 +498,7 @@ impl IncludeArgs {
             expr_ => {
                 abort!(
                     expr_,
-                    "Argument must be a struct relative path, e.g. `proto::MyStruct`"
+                    "Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`"
                 );
             }
         };

@@ -1,0 +1,11 @@
+error: `with_this_mod` parameter is required
+  --> tests/ui/with_this_mod_missing.rs:6:5
+   |
+6  | /     prost_unwrap::include!(from_source(
+7  | |         "../../../../prost-unwrap-proto-tests/.proto_out/root.inner.rs"
+8  | |     )
+9  | |     .with_original_mod(crate::original)
+10 | |     .with_struct(A, []));
+   | |________________________^
+   |
+   = note: this error originates in the macro `prost_unwrap::include` (in Nightly builds, run with -Z macro-backtrace for more info)

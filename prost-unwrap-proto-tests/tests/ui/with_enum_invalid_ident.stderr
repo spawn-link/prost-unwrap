@@ -1,0 +1,5 @@
+error: Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`
+  --> tests/ui/with_enum_invalid_ident.rs:11:16
+   |
+11 |     .with_enum("B"));
+   |                ^^^

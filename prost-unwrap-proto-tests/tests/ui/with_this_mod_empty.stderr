@@ -1,0 +1,5 @@
+error: Parameter must have 1 argument
+  --> tests/ui/with_this_mod_empty.rs:10:6
+   |
+10 |     .with_this_mod()
+   |      ^^^^^^^^^^^^^

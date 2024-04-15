@@ -1,0 +1,7 @@
+error: Unexpected syntax: unexpected end of input, expected an expression
+ --> tests/ui/empty.rs:2:5
+  |
+2 |     prost_unwrap::include!();
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `prost_unwrap::include` (in Nightly builds, run with -Z macro-backtrace for more info)

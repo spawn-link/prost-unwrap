@@ -1,0 +1,5 @@
+error: Parameter must have 1 or 2 arguments
+  --> tests/ui/with_enum_no_ident.rs:11:6
+   |
+11 |     .with_enum());
+   |      ^^^^^^^^^

@@ -6,3 +6,8 @@ message A {
   int32 f1 = 1;
   string f2 = 2;
 }
+
+enum B {
+  DEFAULT = 0;
+  NON_DEFAULT = 1;
+}

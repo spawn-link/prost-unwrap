@@ -43,6 +43,27 @@ jobs:
       - name: Check unused dependencies
         run: cargo machete
 
+  ui-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - nightly
+    steps:
+      - uses: actions/checkout@v4
+      - name: install toolchain (${{ matrix.toolchain }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+      - name: test
+        run: cargo test trybuild --features=trybuild-tests
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:

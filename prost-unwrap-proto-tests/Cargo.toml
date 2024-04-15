@@ -9,6 +9,10 @@ path = "src/lib.rs"
 
 [dependencies]
 prost-unwrap = { path = ".." }
+trybuild = "1.0.91"
 
 [build-dependencies]
 prost-build = "0.12"
+
+[features]
+trybuild-tests = []

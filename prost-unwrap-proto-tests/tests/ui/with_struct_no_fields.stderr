@@ -1,0 +1,5 @@
+error: Parameter must have 2 or 3 arguments
+  --> tests/ui/with_struct_no_fields.rs:11:6
+   |
+11 |     .with_struct(A));
+   |      ^^^^^^^^^^^

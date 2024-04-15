@@ -1,0 +1,5 @@
+error: Parameter argument must be an absolute module path literal, e.g. `crate::proto`
+ --> tests/ui/with_original_mod_invalid.rs:9:24
+  |
+9 |     .with_original_mod("original")
+  |                        ^^^^^^^^^^

@@ -49,8 +49,7 @@ use crate::traverse::*;
 ///     - error type
 ///     - conversion functions (option, hashmap, vec) (TryFrom<O>, Into<O>)
 pub fn include(_item: TokenStream) -> TokenStream {
-    let args = parse2::<IncludeArgs>(_item).unwrap();
-    println!("{}", args);
+    let _args = parse2::<IncludeArgs>(_item).unwrap();
     TokenStream::new()
 }
 
