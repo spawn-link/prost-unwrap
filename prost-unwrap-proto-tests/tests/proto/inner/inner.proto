@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package root.inner;
+
+import "root.proto";
+
+message A {
+  int32 f1 = 1;
+  root.A f2 = 2;
+}

@@ -15,4 +15,4 @@ proc-macro = true
 
 [dependencies]
 proc-macro-error = "1.0"
-prost-unwrap-core = { version = "0.1.4", path = "../prost-unwrap-core" }
+prost-unwrap-core = { version = "0.1.5", path = "../prost-unwrap-core" }

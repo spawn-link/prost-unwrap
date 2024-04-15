@@ -1,7 +1,9 @@
+mod include_args;
 mod macro_args;
 mod traverse;
 mod type_path;
 
+use include_args::IncludeArgs;
 use proc_macro2::TokenStream;
 use proc_macro_error::abort;
 use quote::quote;
@@ -14,6 +16,43 @@ use syn::Visibility;
 
 use crate::macro_args::MacroArgs;
 use crate::traverse::*;
+
+/// The idea for this macro
+/// - Collect the config, that contains
+///     - this module path
+///     - original prost-generated structs module path
+///     - maybe structs and enums postfix
+///     - a prost-generated file that has a name of proto package (or specify)
+///     - a number of structs specs
+///         - struct fqn
+///         - array of required fields
+///         - array of additional attributes
+///     - a number of enums
+///         - enum fqn
+///         - array of additional attributes
+/// - For each linked file
+///     - Read and load the file into token streams
+///     - Traverse the AST, collecting
+///         - for each struct
+///             - struct fqn, AST, array of fields with field type
+///             - enum fqn, AST, array of variants with variant inner type if any
+/// - Traverse the collected data
+///     - validate that all configured structs and enums do exist
+///     - either
+///         - related types (option, hashmap, vec) are also configured
+///         - related types (option, hashmap, vec) are also added to the config
+///     - if conditions are not met, throw an error
+///         - unknown struct
+///         - unknwon field
+///         - related type is not configured
+/// - Assemble the module AST, including
+///     - error type
+///     - conversion functions (option, hashmap, vec) (TryFrom<O>, Into<O>)
+pub fn include(_item: TokenStream) -> TokenStream {
+    let args = parse2::<IncludeArgs>(_item).unwrap();
+    println!("{}", args);
+    TokenStream::new()
+}
 
 pub fn required(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = match parse2::<MacroArgs>(attr) {
@@ -75,7 +114,10 @@ fn copy_modified(
             items.extend(EnumImpl::traverse(args, item_enum, mod_stack)?);
             Ok(items)
         }
-        item => Ok(vec![item.clone()]),
+        item => {
+            println!("{}", quote!(#item));
+            Ok(vec![item.clone()])
+        }
     }
 }
 

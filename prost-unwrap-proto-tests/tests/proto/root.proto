@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package root;
+
+message A {
+  int32 f1 = 1;
+  string f2 = 2;
+}
