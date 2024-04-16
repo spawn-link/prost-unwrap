@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use derive_builder::Builder;
 use proc_macro2::Span;
-use proc_macro_error::abort;
 use quote::quote;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
@@ -46,37 +45,24 @@ impl Display for IncludeArgs {
         let struct_specs = self
             .struct_specs
             .iter()
-            .map(
-                |StructSpec {
-                     fqn,
-                     fields,
-                     attributes,
-                 }| {
-                    format!(
-                        "{}<({}) ({})>",
-                        quote!(#fqn).to_string().replace(' ', ""),
-                        fields
-                            .iter()
-                            .map(|ident| { quote!(#ident).to_string() })
-                            .collect::<Vec<String>>()
-                            .join(","),
-                        attributes.join(",")
-                    )
-                },
-            )
+            .map(|StructSpec { fqn, fields }| {
+                format!(
+                    "{}<({})>",
+                    quote!(#fqn).to_string().replace(' ', ""),
+                    fields
+                        .iter()
+                        .map(|ident| { quote!(#ident).to_string() })
+                        .collect::<Vec<String>>()
+                        .join(",")
+                )
+            })
             .collect::<Vec<String>>()
             .join(", ");
 
         let enum_specs = self
             .enum_specs
             .iter()
-            .map(|EnumSpec { fqn, attributes }| {
-                format!(
-                    "{}<({})>",
-                    quote!(#fqn).to_string().replace(' ', ""),
-                    attributes.join(",")
-                )
-            })
+            .map(|EnumSpec { fqn }| quote!(#fqn).to_string().replace(' ', ""))
             .collect::<Vec<String>>()
             .join(", ");
 
@@ -99,10 +85,7 @@ impl Parse for IncludeArgs {
         let mut expr = input
             .parse::<Expr>()
             .map_err(|e| {
-                abort!(
-                    Span::call_site(),
-                    format!("Unexpected syntax: {}", e.to_string())
-                );
+                abort::call_site(format!("Unexpected syntax: {}", e));
             })
             .unwrap();
 
@@ -110,44 +93,29 @@ impl Parse for IncludeArgs {
 
         if include_args_builder.struct_specs.is_none() && include_args_builder.enum_specs.is_none()
         {
-            abort!(
-                Span::call_site(),
-                format!(
-                    "At least one `{}` or `{}` parameter is required",
-                    Self::QUASI_FN_ENUM_SPEC,
-                    Self::QUASI_FN_STRUCT_SPEC
-                )
-            );
+            abort::call_site(format!(
+                "At least one `{}` or `{}` parameter is required",
+                Self::QUASI_FN_ENUM_SPEC,
+                Self::QUASI_FN_STRUCT_SPEC
+            ));
         }
 
         Ok(include_args_builder
             .build()
             .map_err(|e| match e {
-                IncludeArgsBuilderError::UninitializedField("this_mod_path") => {
-                    abort!(
-                        Span::call_site(),
-                        format!("`{}` parameter is required", Self::QUASI_FN_THIS_MOD_PATH)
-                    )
-                }
-                IncludeArgsBuilderError::UninitializedField("orig_mod_path") => {
-                    abort!(
-                        Span::call_site(),
-                        format!("`{}` parameter is required", Self::QUASI_FN_ORIG_MOD_PATH)
-                    )
-                }
-                IncludeArgsBuilderError::UninitializedField("sources") => {
-                    abort!(
-                        Span::call_site(),
-                        format!(
-                            "At least one `{}` parameter is required",
-                            Self::QUASI_FN_SOURCE
-                        )
-                    )
-                }
-                _ => abort!(
-                    Span::call_site(),
-                    format!("Unexpected macro error, please report: {}", e.to_string())
+                IncludeArgsBuilderError::UninitializedField("this_mod_path") => abort::call_site(
+                    format!("`{}` parameter is required", Self::QUASI_FN_THIS_MOD_PATH),
                 ),
+                IncludeArgsBuilderError::UninitializedField("orig_mod_path") => abort::call_site(
+                    format!("`{}` parameter is required", Self::QUASI_FN_ORIG_MOD_PATH),
+                ),
+                IncludeArgsBuilderError::UninitializedField("sources") => {
+                    abort::call_site(format!(
+                        "At least one `{}` parameter is required",
+                        Self::QUASI_FN_SOURCE
+                    ))
+                }
+                _ => abort::call_site(format!("Unexpected macro error, please report: {}", e)),
             })
             .unwrap())
     }
@@ -195,7 +163,7 @@ impl IncludeArgs {
                 }
             }
 
-            expr_ => abort!(expr_, format!("Unexpected macro call syntax")),
+            expr_ => abort::spanned(expr_, "Unexpected macro call syntax"),
         }
     }
 
@@ -224,18 +192,20 @@ impl IncludeArgs {
             Self::QUASI_FN_ENUM_SPEC => {
                 Self::parse_enum_spec(include_args_builder, expr_args, expr_span)
             }
-            _other => abort!(
+            _other => abort::span(
                 expr_span,
-                "Unknown configuration parameter, must be one of: {}",
-                [
-                    Self::QUASI_FN_SOURCE,
-                    Self::QUASI_FN_THIS_MOD_PATH,
-                    Self::QUASI_FN_ORIG_MOD_PATH,
-                    Self::QUASI_FN_ITEMS_SUFFIX,
-                    Self::QUASI_FN_ENUM_SPEC,
-                    Self::QUASI_FN_STRUCT_SPEC,
-                ]
-                .join(", ")
+                format!(
+                    "Unknown configuration parameter, must be one of: {}",
+                    [
+                        Self::QUASI_FN_SOURCE,
+                        Self::QUASI_FN_THIS_MOD_PATH,
+                        Self::QUASI_FN_ORIG_MOD_PATH,
+                        Self::QUASI_FN_ITEMS_SUFFIX,
+                        Self::QUASI_FN_ENUM_SPEC,
+                        Self::QUASI_FN_STRUCT_SPEC,
+                    ]
+                    .join(", ")
+                ),
             ),
         }
     }
@@ -247,17 +217,17 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if include_args_builder.this_mod_path.is_some() {
-            abort!(
+            abort::span(
                 expr_span,
                 format!(
                     "Multiple `{}` parameters are not allowed",
                     Self::QUASI_FN_THIS_MOD_PATH
-                )
+                ),
             )
         }
 
         if call_args.len() != 1 {
-            abort!(expr_span, "Parameter must have 1 argument");
+            abort::span(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -267,9 +237,9 @@ impl IncludeArgs {
             }
         }
 
-        abort!(
+        abort::spanned(
             call_args,
-            "Parameter argument must be an absolute module path literal, e.g. `crate::proto`"
+            "Parameter argument must be an absolute module path literal, e.g. `crate::proto`",
         );
     }
 
@@ -280,17 +250,17 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if include_args_builder.orig_mod_path.is_some() {
-            abort!(
+            abort::span(
                 expr_span,
                 format!(
                     "Multiple `{}` parameters are not allowed",
                     Self::QUASI_FN_ORIG_MOD_PATH
-                )
+                ),
             )
         }
 
         if call_args.len() != 1 {
-            abort!(expr_span, "Parameter must have 1 argument");
+            abort::span(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -299,9 +269,9 @@ impl IncludeArgs {
                 return;
             }
         }
-        abort!(
+        abort::spanned(
             call_args,
-            "Parameter argument must be an absolute module path literal, e.g. `crate::proto`"
+            "Parameter argument must be an absolute module path literal, e.g. `crate::proto`",
         )
     }
 
@@ -312,19 +282,19 @@ impl IncludeArgs {
         _expr_span: &Span,
     ) {
         if call_args.len() != 1 {
-            abort!(call_args, "Parameter must have 1 argument");
+            abort::spanned(call_args, "Parameter must have 1 argument");
         }
 
         if let Expr::Lit(lit_expr) = call_args.first().unwrap() {
             if let Lit::Str(str_lit) = &lit_expr.lit {
                 let path_buf = fs::canonicalize(PathBuf::from(str_lit.value()))
                     .map_err(|e| {
-                        abort!(
+                        abort::spanned(
                             str_lit,
                             format!(
                                 "Failed to load prost-generated rust source code from {:?}: {} (cwd: {:?})",
                                 &str_lit.value(),
-                                e.to_string(),
+                                e,
                                 std::env::current_dir().unwrap()
                             )
                         )
@@ -332,13 +302,13 @@ impl IncludeArgs {
                     .unwrap();
                 let contents = fs::read_to_string(&path_buf)
                     .map_err(|e| {
-                        abort!(
+                        abort::spanned(
                             str_lit,
                             format!(
                                 "Failed to load prost-generated rust source code from {:?}: {}",
                                 &path_buf.as_path(),
-                                e.to_string()
-                            )
+                                e
+                            ),
                         )
                     })
                     .unwrap();
@@ -351,7 +321,7 @@ impl IncludeArgs {
             }
         }
 
-        abort!(
+        abort::spanned(
             call_args,
             "Parameter argument must be a string literal path to the prost-generated rust source code"
         )
@@ -364,17 +334,17 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if include_args_builder.items_suffix.is_some() {
-            abort!(
+            abort::span(
                 expr_span,
                 format!(
                     "Multiple `{}` parameters are not allowed",
                     Self::QUASI_FN_ITEMS_SUFFIX
-                )
+                ),
             )
         }
 
         if call_args.len() != 1 {
-            abort!(expr_span, "Parameter must have 1 argument");
+            abort::span(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -383,9 +353,9 @@ impl IncludeArgs {
             return;
         }
 
-        abort!(
+        abort::spanned(
             call_args,
-            "Parameter argument must be an ident literal, e.g. `Suffix`"
+            "Parameter argument must be an ident literal, e.g. `Suffix`",
         )
     }
 
@@ -395,8 +365,8 @@ impl IncludeArgs {
         call_args: &mut Punctuated<Expr, Token![,]>,
         expr_span: &Span,
     ) {
-        if !(2..=3).contains(&call_args.len()) {
-            abort!(expr_span, "Parameter must have 2 or 3 arguments");
+        if call_args.len() != 2 {
+            abort::span(expr_span, "Parameter must have 2 arguments");
         }
 
         let mut call_args_iter = call_args.iter();
@@ -404,7 +374,7 @@ impl IncludeArgs {
         let fqn = match call_args_iter.next().unwrap() {
             Expr::Path(path_expr) => path_expr.path.clone(),
             expr_ => {
-                abort!(
+                abort::spanned(
                     expr_,
                     "Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`"
                 );
@@ -415,65 +385,27 @@ impl IncludeArgs {
             Expr::Array(array_expr) => array_expr
                 .elems
                 .iter()
-                .map(|field_expr| match field_expr {
-                    Expr::Path(field_path_expr) => {
-                        if field_path_expr.path.segments.len() != 1 {
-                            abort!(
-                                field_path_expr,
-                                "Field must be a single ident literal, e.g. `field1`"
-                            );
+                .map(|field_expr| {
+                    if let Expr::Path(field_path_expr) = field_expr {
+                        if field_path_expr.path.segments.len() == 1 {
+                            return field_path_expr.path.segments.first().unwrap().ident.clone();
                         }
-                        field_path_expr.path.segments.first().unwrap().ident.clone()
                     }
-                    expr_ => {
-                        abort!(expr_, "Field must be a single ident literal, e.g. `field1`");
-                    }
+                    abort::spanned(
+                        field_expr,
+                        "Field must be a single ident literal, e.g. `field1`",
+                    );
                 })
                 .collect::<Vec<Ident>>(),
             expr_ => {
-                abort!(
+                abort::spanned(
                     expr_,
-                    "Argument must be an array of fields ident literals, e.g. `[field1, field2]`"
+                    "Argument must be an array of fields ident literals, e.g. `[field1, field2]`",
                 );
             }
         };
 
-        let attributes = match call_args_iter.next() {
-            None => Vec::new(),
-            Some(Expr::Array(array_expr)) => array_expr
-                .elems
-                .iter()
-                .map(|attr_expr| {
-                    if let Expr::Lit(lit_expr) = attr_expr {
-                        if let Lit::Str(lit_str) = &lit_expr.lit {
-                            lit_str.value()
-                        } else {
-                            abort!(
-                                lit_expr,
-                                "Attribute must be a string literal, e.g. `\"#[attribute]\"`"
-                            );
-                        }
-                    } else {
-                        abort!(
-                            attr_expr,
-                            "Attribute must be a string literal, e.g. `\"#[attribute]\"`"
-                        );
-                    }
-                })
-                .collect::<Vec<String>>(),
-            Some(expr_) => {
-                abort!(
-                    expr_,
-                    "Argument must be an array of attributes as string literals, e.g. `[ \"#[attribute]\" ]`"
-                );
-            }
-        };
-
-        let struct_spec = StructSpec {
-            fqn,
-            fields,
-            attributes,
-        };
+        let struct_spec = StructSpec { fqn, fields };
 
         match &mut include_args_builder.struct_specs {
             Some(vec) => vec.push(struct_spec),
@@ -487,8 +419,8 @@ impl IncludeArgs {
         call_args: &mut Punctuated<Expr, Token![,]>,
         expr_span: &Span,
     ) {
-        if !(1..=2).contains(&call_args.len()) {
-            abort!(expr_span, "Parameter must have 1 or 2 arguments");
+        if call_args.len() != 1 {
+            abort::span(expr_span, "Parameter must have 1 argument");
         }
 
         let mut call_args_iter = call_args.iter();
@@ -496,45 +428,14 @@ impl IncludeArgs {
         let fqn = match call_args_iter.next().unwrap() {
             Expr::Path(path_expr) => path_expr.path.clone(),
             expr_ => {
-                abort!(
+                abort::spanned(
                     expr_,
                     "Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`"
                 );
             }
         };
 
-        let attributes = match call_args_iter.next() {
-            None => Vec::new(),
-            Some(Expr::Array(array_expr)) => array_expr
-                .elems
-                .iter()
-                .map(|attr_expr| {
-                    if let Expr::Lit(lit_expr) = attr_expr {
-                        if let Lit::Str(lit_str) = &lit_expr.lit {
-                            lit_str.value()
-                        } else {
-                            abort!(
-                                lit_expr,
-                                "Attribute must be a string literal, e.g. `\"#[attribute]\"`"
-                            );
-                        }
-                    } else {
-                        abort!(
-                            attr_expr,
-                            "Attribute must be a string literal, e.g. `\"#[attribute]\"`"
-                        );
-                    }
-                })
-                .collect::<Vec<String>>(),
-            Some(expr_) => {
-                abort!(
-                    expr_,
-                    "Argument must be an array of attributes as string literals, e.g. `[ \"#[attribute]\" ]`"
-                );
-            }
-        };
-
-        let enum_spec = EnumSpec { fqn, attributes };
+        let enum_spec = EnumSpec { fqn };
 
         match &mut include_args_builder.enum_specs {
             Some(vec) => vec.push(enum_spec),
@@ -554,11 +455,28 @@ pub struct SourceFile {
 pub struct StructSpec {
     pub fqn: Path,
     pub fields: Vec<Ident>,
-    pub attributes: Vec<String>,
 }
 
 #[derive(Clone)]
 pub struct EnumSpec {
     pub fqn: Path,
-    pub attributes: Vec<String>,
+}
+
+pub(crate) mod abort {
+    use proc_macro2::Span;
+    use proc_macro_error::abort;
+    use proc_macro_error::abort_call_site;
+    use syn::spanned::Spanned;
+
+    pub(crate) fn spanned<S: Spanned, T: AsRef<str>>(spanned: &S, msg: T) -> ! {
+        span(&spanned.span(), msg.as_ref());
+    }
+
+    pub(crate) fn span<T: AsRef<str>>(span: &Span, msg: T) -> ! {
+        abort!(span, msg.as_ref());
+    }
+
+    pub(crate) fn call_site<T: AsRef<str>>(msg: T) -> ! {
+        abort_call_site!(msg.as_ref());
+    }
 }

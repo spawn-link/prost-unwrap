@@ -49,7 +49,6 @@ jobs:
       matrix:
         toolchain:
           - stable
-          - nightly
     steps:
       - uses: actions/checkout@v4
       - name: install toolchain (${{ matrix.toolchain }})
@@ -62,7 +61,7 @@ jobs:
           tool: protoc@${{ env.PROTOC_VERSION }}
       - uses: Swatinem/rust-cache@v2
       - name: test
-        run: cargo test trybuild --features=trybuild-tests
+        run: cargo test trybuild --features=ui-tests
 
   test:
     runs-on: ${{ matrix.os }}

@@ -15,4 +15,4 @@ trybuild = "1.0.91"
 prost-build = "0.12"
 
 [features]
-trybuild-tests = []
+ui-tests = []
