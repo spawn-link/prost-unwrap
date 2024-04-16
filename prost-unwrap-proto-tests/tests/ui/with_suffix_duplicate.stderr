@@ -1,5 +1,5 @@
 error: Multiple `with_suffix` parameters are not allowed
-  --> tests/ui/with_suffix_duplicate.rs:12:6
+  --> tests/ui/with_suffix_duplicate.rs:13:6
    |
-12 |     .with_suffix(Sane)
+13 |     .with_suffix(Sane)
    |      ^^^^^^^^^^^

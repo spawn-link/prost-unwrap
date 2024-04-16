@@ -1,0 +1,5 @@
+error: Parameter must have 2 arguments
+ --> tests/ui/from_source_no_path.rs:5:28
+  |
+5 |     prost_unwrap::include!(from_source(root));
+  |                            ^^^^^^^^^^^

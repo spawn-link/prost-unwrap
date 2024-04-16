@@ -1,5 +1,5 @@
 error: Field must be a single ident literal, e.g. `field1`
-  --> tests/ui/with_struct_invalid_field_1.rs:11:22
+  --> tests/ui/with_struct_invalid_field_1.rs:12:22
    |
-11 |     .with_struct(A, ["field"]));
+12 |     .with_struct(A, ["field"]));
    |                      ^^^^^^^

@@ -12,6 +12,7 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Expr;
+use syn::ExprLit;
 use syn::File;
 use syn::Ident;
 use syn::Lit;
@@ -41,8 +42,14 @@ impl Display for IncludeArgs {
         let sources = self
             .sources
             .iter()
-            .map(|SourceFile { path_buf, .. }| path_buf.to_str().unwrap())
-            .collect::<Vec<&str>>()
+            .map(|SourceFile { path_buf, fqn, .. }| {
+                format!(
+                    "{}<{}>",
+                    quote!(#fqn).to_string().replace(' ', ""),
+                    path_buf.to_str().unwrap()
+                )
+            })
+            .collect::<Vec<_>>()
             .join(", ");
 
         let struct_specs = self
@@ -213,6 +220,90 @@ impl IncludeArgs {
         }
     }
 
+    /// Parser for Self::QUASI_FN_SOURCE
+    fn parse_source(
+        include_args_builder: &mut IncludeArgsBuilder,
+        call_args: &mut Punctuated<Expr, Token![,]>,
+        expr_span: &Span,
+    ) {
+        if call_args.len() != 2 {
+            abort!(expr_span, "Parameter must have 2 arguments");
+        }
+
+        let mut call_args_iter = call_args.iter();
+
+        let fqn = match call_args_iter.next().unwrap() {
+            Expr::Path(path_expr) => path_expr.path.clone(),
+            expr_ => abort!(
+                expr_,
+                "Parameter argument must be a module path literal, e.g. `root::submodule`",
+            ),
+        };
+
+        let (path_buf, ast, items) = match call_args_iter.next().unwrap()
+        {
+            Expr::Lit(ExprLit {
+                lit: Lit::Str(str_lit),
+                ..
+            }) => {
+                let path_buf = fs::canonicalize(PathBuf::from(str_lit.value()))
+                    .map_err(|e| {
+                        abort!(
+                            str_lit,
+                            format!(
+                                "Failed to load source code from {:?}: {} (cwd: {:?})",
+                                &str_lit.value(),
+                                e,
+                                std::env::current_dir().unwrap()
+                            ),
+                        )
+                    })
+                    .unwrap();
+
+                let contents = fs::read_to_string(&path_buf)
+                    .map_err(|e| {
+                        abort!(
+                            str_lit,
+                            format!(
+                                "Failed to load source code from {:?}: {}",
+                                &path_buf.as_path(),
+                                e
+                            ),
+                        )
+                    })
+                    .unwrap();
+
+                let ast = syn::parse_file(contents.as_str())
+                    .map_err(|e| {
+                        abort!(
+                            str_lit,
+                            format!("Failed to parse linked source code as rust file: {}", e),
+                        );
+                    })
+                    .unwrap();
+
+                let items = traverse::collect_structs_and_enums(&ast);
+
+                (path_buf, ast, items)
+            },
+            expr_ => abort!(
+                expr_,
+                "Parameter argument must be a string literal path to the prost-generated rust source code"
+            )
+        };
+
+        let source = SourceFile {
+            path_buf,
+            ast,
+            fqn,
+            items,
+        };
+        match &mut include_args_builder.sources {
+            Some(vec) => vec.push(source),
+            None => include_args_builder.sources = Some(vec![source]),
+        }
+    }
+
     /// Parser for Self::QUASI_FN_THIS_MOD_PATH
     fn parse_this_mod_path(
         include_args_builder: &mut IncludeArgsBuilder,
@@ -275,75 +366,6 @@ impl IncludeArgs {
         abort!(
             call_args,
             "Parameter argument must be an absolute module path literal, e.g. `crate::proto`",
-        )
-    }
-
-    /// Parser for Self::QUASI_FN_SOURCE
-    fn parse_source(
-        include_args_builder: &mut IncludeArgsBuilder,
-        call_args: &mut Punctuated<Expr, Token![,]>,
-        _expr_span: &Span,
-    ) {
-        if call_args.len() != 1 {
-            abort!(call_args, "Parameter must have 1 argument");
-        }
-
-        if let Expr::Lit(lit_expr) = call_args.first().unwrap() {
-            if let Lit::Str(str_lit) = &lit_expr.lit {
-                let path_buf = fs::canonicalize(PathBuf::from(str_lit.value()))
-                    .map_err(|e| {
-                        abort!(
-                            str_lit,
-                            format!(
-                                "Failed to load source code from {:?}: {} (cwd: {:?})",
-                                &str_lit.value(),
-                                e,
-                                std::env::current_dir().unwrap()
-                            ),
-                        )
-                    })
-                    .unwrap();
-
-                let contents = fs::read_to_string(&path_buf)
-                    .map_err(|e| {
-                        abort!(
-                            str_lit,
-                            format!(
-                                "Failed to load source code from {:?}: {}",
-                                &path_buf.as_path(),
-                                e
-                            ),
-                        )
-                    })
-                    .unwrap();
-
-                let ast = syn::parse_file(contents.as_str())
-                    .map_err(|e| {
-                        abort!(
-                            str_lit,
-                            format!("Failed to parse linked source code as rust file: {}", e),
-                        );
-                    })
-                    .unwrap();
-
-                let items = traverse::collect_structs_and_enums(&ast);
-
-                let source = SourceFile {
-                    path_buf,
-                    ast,
-                    items,
-                };
-                match &mut include_args_builder.sources {
-                    Some(vec) => vec.push(source),
-                    None => include_args_builder.sources = Some(vec![source]),
-                }
-                return;
-            }
-        }
-
-        abort!(
-            call_args,
-            "Parameter argument must be a string literal path to the prost-generated rust source code"
         )
     }
 
@@ -469,6 +491,7 @@ impl IncludeArgs {
 pub(crate) struct SourceFile {
     pub path_buf: PathBuf,
     pub ast: File,
+    pub fqn: Path,
     pub items: Vec<SourceFileItem>,
 }
 

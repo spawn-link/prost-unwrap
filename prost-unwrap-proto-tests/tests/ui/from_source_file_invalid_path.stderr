@@ -1,0 +1,5 @@
+error: Parameter argument must be a string literal path to the prost-generated rust source code
+ --> tests/ui/from_source_file_invalid_path.rs:5:46
+  |
+5 |     prost_unwrap::include!(from_source(root, InvalidSourceFileArgType));
+  |                                              ^^^^^^^^^^^^^^^^^^^^^^^^

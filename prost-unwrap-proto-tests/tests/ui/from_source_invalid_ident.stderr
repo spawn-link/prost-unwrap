@@ -1,0 +1,5 @@
+error: Parameter argument must be a module path literal, e.g. `root::submodule`
+ --> tests/ui/from_source_invalid_ident.rs:6:9
+  |
+6 |         "root",
+  |         ^^^^^^

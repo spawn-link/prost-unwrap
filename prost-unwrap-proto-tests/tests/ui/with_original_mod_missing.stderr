@@ -2,10 +2,11 @@ error: `with_original_mod` parameter is required
   --> tests/ui/with_original_mod_missing.rs:6:5
    |
 6  | /     prost_unwrap::include!(from_source(
-7  | |         "../../../../prost-unwrap-proto-tests/.proto_out/root.inner.rs"
-8  | |     )
-9  | |     .with_this_mod(crate::test)
-10 | |     .with_struct(A, []));
+7  | |         root::inner,
+8  | |         "../../../../prost-unwrap-proto-tests/.proto_out/root.inner.rs"
+9  | |     )
+10 | |     .with_this_mod(crate::test)
+11 | |     .with_struct(A, []));
    | |________________________^
    |
    = note: this error originates in the macro `prost_unwrap::include` (in Nightly builds, run with -Z macro-backtrace for more info)

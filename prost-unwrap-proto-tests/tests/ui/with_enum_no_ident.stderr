@@ -1,5 +1,5 @@
 error: Parameter must have 1 argument
-  --> tests/ui/with_enum_no_ident.rs:11:6
+  --> tests/ui/with_enum_no_ident.rs:12:6
    |
-11 |     .with_enum());
+12 |     .with_enum());
    |      ^^^^^^^^^

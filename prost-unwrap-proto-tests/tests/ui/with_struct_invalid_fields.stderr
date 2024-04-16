@@ -1,5 +1,5 @@
 error: Argument must be an array of fields ident literals, e.g. `[field1, field2]`
-  --> tests/ui/with_struct_invalid_fields.rs:11:21
+  --> tests/ui/with_struct_invalid_fields.rs:12:21
    |
-11 |     .with_struct(A, ""));
+12 |     .with_struct(A, ""));
    |                     ^^

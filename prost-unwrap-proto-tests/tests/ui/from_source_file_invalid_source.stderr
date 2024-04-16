@@ -1,5 +1,5 @@
 error: Failed to parse linked source code as rust file: expected one of: `fn`, `extern`, `use`, `static`, `const`, `unsafe`, `mod`, `type`, `struct`, `enum`, `union`, `trait`, `auto`, `impl`, `default`, `macro`, identifier, `self`, `super`, `crate`, `::`
- --> tests/ui/from_source_file_invalid_source.rs:6:9
+ --> tests/ui/from_source_file_invalid_source.rs:7:9
   |
-6 |         "../../../../prost-unwrap-proto-tests/.proto_out/.gitignore"
+7 |         "../../../../prost-unwrap-proto-tests/.proto_out/.gitignore"
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

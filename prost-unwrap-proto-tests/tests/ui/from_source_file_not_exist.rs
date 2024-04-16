@@ -3,7 +3,8 @@ mod test {
     // within trybuild test is
     // $WORKSPACE/target/tests/trybuild/prost-unwrap-proto-tests
     prost_unwrap::include!(from_source(
-        "prost-unwrap-proto-tests/.proto_out/root.inner.rs"
+        root,
+        "prost-unwrap-proto-tests/.proto_out/root.rs"
     ));
 }
 
