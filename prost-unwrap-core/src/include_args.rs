@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use derive_builder::Builder;
 use proc_macro2::Span;
+use proc_macro_error::abort;
+use proc_macro_error::abort_call_site;
 use quote::quote;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
@@ -86,7 +88,7 @@ impl Parse for IncludeArgs {
         let mut expr = input
             .parse::<Expr>()
             .map_err(|e| {
-                abort::call_site(format!("Unexpected syntax: {}", e));
+                abort_call_site!(format!("Unexpected syntax: {}", e));
             })
             .unwrap();
 
@@ -94,7 +96,7 @@ impl Parse for IncludeArgs {
 
         if include_args_builder.struct_specs.is_none() && include_args_builder.enum_specs.is_none()
         {
-            abort::call_site(format!(
+            abort_call_site!(format!(
                 "At least one `{}` or `{}` parameter is required",
                 Self::QUASI_FN_ENUM_SPEC,
                 Self::QUASI_FN_STRUCT_SPEC
@@ -104,19 +106,19 @@ impl Parse for IncludeArgs {
         Ok(include_args_builder
             .build()
             .map_err(|e| match e {
-                IncludeArgsBuilderError::UninitializedField("this_mod_path") => abort::call_site(
+                IncludeArgsBuilderError::UninitializedField("this_mod_path") => abort_call_site!(
                     format!("`{}` parameter is required", Self::QUASI_FN_THIS_MOD_PATH),
                 ),
-                IncludeArgsBuilderError::UninitializedField("orig_mod_path") => abort::call_site(
+                IncludeArgsBuilderError::UninitializedField("orig_mod_path") => abort_call_site!(
                     format!("`{}` parameter is required", Self::QUASI_FN_ORIG_MOD_PATH),
                 ),
                 IncludeArgsBuilderError::UninitializedField("sources") => {
-                    abort::call_site(format!(
+                    abort_call_site!(format!(
                         "At least one `{}` parameter is required",
                         Self::QUASI_FN_SOURCE
                     ))
                 }
-                _ => abort::call_site(format!("Unexpected macro error, please report: {}", e)),
+                _ => abort_call_site!(format!("Unexpected macro error, please report: {}", e)),
             })
             .unwrap())
     }
@@ -164,7 +166,7 @@ impl IncludeArgs {
                 }
             }
 
-            expr_ => abort::spanned(expr_, "Unexpected macro call syntax"),
+            expr_ => abort!(expr_, "Unexpected macro call syntax"),
         }
     }
 
@@ -193,7 +195,7 @@ impl IncludeArgs {
             Self::QUASI_FN_ENUM_SPEC => {
                 Self::parse_enum_spec(include_args_builder, expr_args, expr_span)
             }
-            _other => abort::span(
+            _other => abort!(
                 expr_span,
                 format!(
                     "Unknown configuration parameter, must be one of: {}",
@@ -218,7 +220,7 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if include_args_builder.this_mod_path.is_some() {
-            abort::span(
+            abort!(
                 expr_span,
                 format!(
                     "Multiple `{}` parameters are not allowed",
@@ -228,7 +230,7 @@ impl IncludeArgs {
         }
 
         if call_args.len() != 1 {
-            abort::span(expr_span, "Parameter must have 1 argument");
+            abort!(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -238,7 +240,7 @@ impl IncludeArgs {
             }
         }
 
-        abort::spanned(
+        abort!(
             call_args,
             "Parameter argument must be an absolute module path literal, e.g. `crate::proto`",
         );
@@ -251,7 +253,7 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if include_args_builder.orig_mod_path.is_some() {
-            abort::span(
+            abort!(
                 expr_span,
                 format!(
                     "Multiple `{}` parameters are not allowed",
@@ -261,7 +263,7 @@ impl IncludeArgs {
         }
 
         if call_args.len() != 1 {
-            abort::span(expr_span, "Parameter must have 1 argument");
+            abort!(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -270,7 +272,7 @@ impl IncludeArgs {
                 return;
             }
         }
-        abort::spanned(
+        abort!(
             call_args,
             "Parameter argument must be an absolute module path literal, e.g. `crate::proto`",
         )
@@ -283,14 +285,14 @@ impl IncludeArgs {
         _expr_span: &Span,
     ) {
         if call_args.len() != 1 {
-            abort::spanned(call_args, "Parameter must have 1 argument");
+            abort!(call_args, "Parameter must have 1 argument");
         }
 
         if let Expr::Lit(lit_expr) = call_args.first().unwrap() {
             if let Lit::Str(str_lit) = &lit_expr.lit {
                 let path_buf = fs::canonicalize(PathBuf::from(str_lit.value()))
                     .map_err(|e| {
-                        abort::spanned(
+                        abort!(
                             str_lit,
                             format!(
                                 "Failed to load source code from {:?}: {} (cwd: {:?})",
@@ -304,7 +306,7 @@ impl IncludeArgs {
 
                 let contents = fs::read_to_string(&path_buf)
                     .map_err(|e| {
-                        abort::spanned(
+                        abort!(
                             str_lit,
                             format!(
                                 "Failed to load source code from {:?}: {}",
@@ -317,14 +319,20 @@ impl IncludeArgs {
 
                 let ast = syn::parse_file(contents.as_str())
                     .map_err(|e| {
-                        abort::spanned(
+                        abort!(
                             str_lit,
                             format!("Failed to parse linked source code as rust file: {}", e),
                         );
                     })
                     .unwrap();
 
-                let source = SourceFile { path_buf, ast };
+                let items = traverse::collect_structs_and_enums(&ast);
+
+                let source = SourceFile {
+                    path_buf,
+                    ast,
+                    items,
+                };
                 match &mut include_args_builder.sources {
                     Some(vec) => vec.push(source),
                     None => include_args_builder.sources = Some(vec![source]),
@@ -333,7 +341,7 @@ impl IncludeArgs {
             }
         }
 
-        abort::spanned(
+        abort!(
             call_args,
             "Parameter argument must be a string literal path to the prost-generated rust source code"
         )
@@ -346,7 +354,7 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if include_args_builder.items_suffix.is_some() {
-            abort::span(
+            abort!(
                 expr_span,
                 format!(
                     "Multiple `{}` parameters are not allowed",
@@ -356,7 +364,7 @@ impl IncludeArgs {
         }
 
         if call_args.len() != 1 {
-            abort::span(expr_span, "Parameter must have 1 argument");
+            abort!(expr_span, "Parameter must have 1 argument");
         }
 
         if let Expr::Path(path_expr) = call_args.first().unwrap() {
@@ -365,7 +373,7 @@ impl IncludeArgs {
             return;
         }
 
-        abort::spanned(
+        abort!(
             call_args,
             "Parameter argument must be an ident literal, e.g. `Suffix`",
         )
@@ -378,7 +386,7 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if call_args.len() != 2 {
-            abort::span(expr_span, "Parameter must have 2 arguments");
+            abort!(expr_span, "Parameter must have 2 arguments");
         }
 
         let mut call_args_iter = call_args.iter();
@@ -386,7 +394,7 @@ impl IncludeArgs {
         let fqn = match call_args_iter.next().unwrap() {
             Expr::Path(path_expr) => path_expr.path.clone(),
             expr_ => {
-                abort::spanned(
+                abort!(
                     expr_,
                     "Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`"
                 );
@@ -403,14 +411,14 @@ impl IncludeArgs {
                             return field_path_expr.path.segments.first().unwrap().ident.clone();
                         }
                     }
-                    abort::spanned(
+                    abort!(
                         field_expr,
                         "Field must be a single ident literal, e.g. `field1`",
                     );
                 })
                 .collect::<Vec<Ident>>(),
             expr_ => {
-                abort::spanned(
+                abort!(
                     expr_,
                     "Argument must be an array of fields ident literals, e.g. `[field1, field2]`",
                 );
@@ -432,7 +440,7 @@ impl IncludeArgs {
         expr_span: &Span,
     ) {
         if call_args.len() != 1 {
-            abort::span(expr_span, "Parameter must have 1 argument");
+            abort!(expr_span, "Parameter must have 1 argument");
         }
 
         let mut call_args_iter = call_args.iter();
@@ -440,7 +448,7 @@ impl IncludeArgs {
         let fqn = match call_args_iter.next().unwrap() {
             Expr::Path(path_expr) => path_expr.path.clone(),
             expr_ => {
-                abort::spanned(
+                abort!(
                     expr_,
                     "Argument must be a path literal relative to `with_original_mod` argument, e.g. `root::Something`"
                 );
@@ -457,38 +465,95 @@ impl IncludeArgs {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)] // remove after contents is accessed
-pub struct SourceFile {
+#[allow(dead_code)]
+pub(crate) struct SourceFile {
     pub path_buf: PathBuf,
     pub ast: File,
+    pub items: Vec<SourceFileItem>,
 }
 
 #[derive(Clone)]
-pub struct StructSpec {
+#[allow(dead_code)]
+pub(crate) enum SourceFileItem {
+    Struct(String),
+    Enum(String),
+}
+
+#[derive(Clone)]
+pub(crate) struct StructSpec {
     pub fqn: Path,
     pub fields: Vec<Ident>,
 }
 
 #[derive(Clone)]
-pub struct EnumSpec {
+pub(crate) struct EnumSpec {
     pub fqn: Path,
 }
 
-pub(crate) mod abort {
-    use proc_macro2::Span;
-    use proc_macro_error::abort;
-    use proc_macro_error::abort_call_site;
-    use syn::spanned::Spanned;
+pub(crate) mod traverse {
+    use syn::visit;
+    use syn::visit::Visit;
+    use syn::ItemEnum;
+    use syn::ItemMod;
+    use syn::ItemStruct;
 
-    pub(crate) fn spanned<S: Spanned, T: AsRef<str>>(spanned: &S, msg: T) -> ! {
-        span(&spanned.span(), msg.as_ref());
+    /// Custom visitor to collect paths to all structs and enums.
+    struct CollectPaths {
+        current_path: Vec<String>,
+        paths: Vec<super::SourceFileItem>,
     }
 
-    pub(crate) fn span<T: AsRef<str>>(span: &Span, msg: T) -> ! {
-        abort!(span, msg.as_ref());
+    impl CollectPaths {
+        fn new() -> Self {
+            CollectPaths {
+                current_path: Vec::new(),
+                paths: Vec::new(),
+            }
+        }
     }
 
-    pub(crate) fn call_site<T: AsRef<str>>(msg: T) -> ! {
-        abort_call_site!(msg.as_ref());
+    impl<'ast> Visit<'ast> for CollectPaths {
+        fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
+            let ident = item.ident.to_string();
+            self.paths.push(super::SourceFileItem::Struct(
+                self.current_path
+                    .iter()
+                    .chain([ident].iter())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("::"),
+            ));
+            visit::visit_item_struct(self, item);
+        }
+
+        fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
+            let ident = item.ident.to_string();
+            self.paths.push(super::SourceFileItem::Enum(
+                self.current_path
+                    .iter()
+                    .chain([ident].iter())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join("::"),
+            ));
+            visit::visit_item_enum(self, item);
+        }
+
+        fn visit_item_mod(&mut self, item: &'ast ItemMod) {
+            if let Some(content) = &item.content {
+                self.current_path.push(item.ident.to_string());
+                for item in &content.1 {
+                    self.visit_item(item);
+                }
+                self.current_path.pop();
+            }
+            visit::visit_item_mod(self, item);
+        }
+    }
+
+    pub(crate) fn collect_structs_and_enums(file: &syn::File) -> Vec<super::SourceFileItem> {
+        let mut collector = CollectPaths::new();
+        collector.visit_file(file);
+        collector.paths
     }
 }

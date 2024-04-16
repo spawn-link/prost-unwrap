@@ -11,7 +11,7 @@ keywords = ["protobuf", "grpc", "prost", "tonic"]
 categories = ["data-structures", "rust-patterns"]
 
 [dependencies]
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 proc-macro-error = "1.0"
