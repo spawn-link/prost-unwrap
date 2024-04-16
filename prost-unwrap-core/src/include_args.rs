@@ -10,6 +10,7 @@ use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Expr;
+use syn::File;
 use syn::Ident;
 use syn::Lit;
 use syn::Path;
@@ -292,27 +293,38 @@ impl IncludeArgs {
                         abort::spanned(
                             str_lit,
                             format!(
-                                "Failed to load prost-generated rust source code from {:?}: {} (cwd: {:?})",
+                                "Failed to load source code from {:?}: {} (cwd: {:?})",
                                 &str_lit.value(),
                                 e,
                                 std::env::current_dir().unwrap()
-                            )
+                            ),
                         )
                     })
                     .unwrap();
+
                 let contents = fs::read_to_string(&path_buf)
                     .map_err(|e| {
                         abort::spanned(
                             str_lit,
                             format!(
-                                "Failed to load prost-generated rust source code from {:?}: {}",
+                                "Failed to load source code from {:?}: {}",
                                 &path_buf.as_path(),
                                 e
                             ),
                         )
                     })
                     .unwrap();
-                let source = SourceFile { path_buf, contents };
+
+                let ast = syn::parse_file(contents.as_str())
+                    .map_err(|e| {
+                        abort::spanned(
+                            str_lit,
+                            format!("Failed to parse linked source code as rust file: {}", e),
+                        );
+                    })
+                    .unwrap();
+
+                let source = SourceFile { path_buf, ast };
                 match &mut include_args_builder.sources {
                     Some(vec) => vec.push(source),
                     None => include_args_builder.sources = Some(vec![source]),
@@ -448,7 +460,7 @@ impl IncludeArgs {
 #[allow(dead_code)] // remove after contents is accessed
 pub struct SourceFile {
     pub path_buf: PathBuf,
-    pub contents: String,
+    pub ast: File,
 }
 
 #[derive(Clone)]

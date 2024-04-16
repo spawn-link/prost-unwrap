@@ -1,4 +1,4 @@
-error: Failed to load prost-generated rust source code from "prost-unwrap-proto-tests/.proto_out/root.inner.rs": No such file or directory (os error 2) (cwd: "$WORKSPACE/target/tests/trybuild/prost-unwrap-proto-tests")
+error: Failed to load source code from "prost-unwrap-proto-tests/.proto_out/root.inner.rs": No such file or directory (os error 2) (cwd: "$WORKSPACE/target/tests/trybuild/prost-unwrap-proto-tests")
  --> tests/ui/from_source_file_not_exist.rs:6:9
   |
 6 |         "prost-unwrap-proto-tests/.proto_out/root.inner.rs"
