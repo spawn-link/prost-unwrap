@@ -19,6 +19,9 @@ use syn::Lit;
 use syn::Path;
 use syn::Token;
 
+use self::spec_tree::SpecTreeLeaf;
+use self::spec_tree::SpecTreeNode;
+
 /// The `include!`` macro arguments.
 /// Contains all needed information for AST traversal.
 #[derive(Builder, Clone)]
@@ -28,10 +31,7 @@ pub struct IncludeArgs {
     #[builder(default = "None")]
     pub items_suffix: Option<Ident>,
     pub sources: Vec<SourceFile>,
-    #[builder(default = "Vec::new()")]
-    pub struct_specs: Vec<StructSpec>,
-    #[builder(default = "Vec::new()")]
-    pub enum_specs: Vec<EnumSpec>,
+    pub spec_tree: SpecTreeNode,
 }
 
 impl Display for IncludeArgs {
@@ -46,40 +46,18 @@ impl Display for IncludeArgs {
                 format!(
                     "{}<{}>",
                     quote!(#fqn).to_string().replace(' ', ""),
-                    path_buf.to_str().unwrap()
+                    path_buf
+                        .to_str()
+                        .expect("Expected path_buf to render to str")
                 )
             })
             .collect::<Vec<_>>()
             .join(", ");
 
-        let struct_specs = self
-            .struct_specs
-            .iter()
-            .map(|StructSpec { fqn, fields }| {
-                format!(
-                    "{}<({})>",
-                    quote!(#fqn).to_string().replace(' ', ""),
-                    fields
-                        .iter()
-                        .map(|ident| { quote!(#ident).to_string() })
-                        .collect::<Vec<String>>()
-                        .join(",")
-                )
-            })
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        let enum_specs = self
-            .enum_specs
-            .iter()
-            .map(|EnumSpec { fqn }| quote!(#fqn).to_string().replace(' ', ""))
-            .collect::<Vec<String>>()
-            .join(", ");
-
         write!(
             f,
-            "IncludeArgs< this_mod_path = {}, orig_mod_path = {}, items_suffix = {:?}, sources = [ {} ], struct_specs = [ {} ], enum_specs = [ {} ] >",
-            quote!(#this_mod_path), quote!(#orig_mod_path), self.items_suffix, sources, struct_specs, enum_specs
+            "IncludeArgs< this_mod_path = {}, orig_mod_path = {}, items_suffix = {:?}, sources = [ {} ], spec_tree = <{:?}> >",
+            quote!(#this_mod_path), quote!(#orig_mod_path), self.items_suffix, sources, self.spec_tree
         )
     }
 }
@@ -92,6 +70,7 @@ impl Parse for IncludeArgs {
     /// human-readable errors.
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut include_args_builder = IncludeArgsBuilder::default();
+        include_args_builder.spec_tree(SpecTreeNode::new());
         let mut expr = input
             .parse::<Expr>()
             .map_err(|e| {
@@ -101,16 +80,7 @@ impl Parse for IncludeArgs {
 
         Self::parse_call_chain(&mut include_args_builder, &mut expr);
 
-        if include_args_builder.struct_specs.is_none() && include_args_builder.enum_specs.is_none()
-        {
-            abort_call_site!(format!(
-                "At least one `{}` or `{}` parameter is required",
-                Self::QUASI_FN_ENUM_SPEC,
-                Self::QUASI_FN_STRUCT_SPEC
-            ));
-        }
-
-        Ok(include_args_builder
+        let args = include_args_builder
             .build()
             .map_err(|e| match e {
                 IncludeArgsBuilderError::UninitializedField("this_mod_path") => abort_call_site!(
@@ -127,7 +97,9 @@ impl Parse for IncludeArgs {
                 }
                 _ => abort_call_site!(format!("Unexpected macro error, please report: {}", e)),
             })
-            .unwrap())
+            .unwrap();
+
+        Ok(args)
     }
 }
 
@@ -240,7 +212,7 @@ impl IncludeArgs {
             ),
         };
 
-        let (path_buf, ast, items) = match call_args_iter.next().unwrap()
+        let (path_buf, ast) = match call_args_iter.next().unwrap()
         {
             Expr::Lit(ExprLit {
                 lit: Lit::Str(str_lit),
@@ -254,7 +226,7 @@ impl IncludeArgs {
                                 "Failed to load source code from {:?}: {} (cwd: {:?})",
                                 &str_lit.value(),
                                 e,
-                                std::env::current_dir().unwrap()
+                                std::env::current_dir().expect("Expected current dir to be present")
                             ),
                         )
                     })
@@ -282,9 +254,8 @@ impl IncludeArgs {
                     })
                     .unwrap();
 
-                let items = traverse::collect_structs_and_enums(&ast);
 
-                (path_buf, ast, items)
+                (path_buf, ast)
             },
             expr_ => abort!(
                 expr_,
@@ -292,12 +263,7 @@ impl IncludeArgs {
             )
         };
 
-        let source = SourceFile {
-            path_buf,
-            ast,
-            fqn,
-            items,
-        };
+        let source = SourceFile { path_buf, ast, fqn };
         match &mut include_args_builder.sources {
             Some(vec) => vec.push(source),
             None => include_args_builder.sources = Some(vec![source]),
@@ -447,12 +413,13 @@ impl IncludeArgs {
             }
         };
 
-        let struct_spec = StructSpec { fqn, fields };
+        let struct_spec = SpecTreeLeaf::StructSpec { fqn, fields };
 
-        match &mut include_args_builder.struct_specs {
-            Some(vec) => vec.push(struct_spec),
-            None => include_args_builder.struct_specs = Some(vec![struct_spec]),
-        }
+        include_args_builder
+            .spec_tree
+            .as_mut()
+            .expect("Expected spec_tree to be Some")
+            .push(struct_spec);
     }
 
     /// Parser for Self::QUASI_FN_ENUM_SPEC
@@ -477,12 +444,13 @@ impl IncludeArgs {
             }
         };
 
-        let enum_spec = EnumSpec { fqn };
+        let enum_spec = SpecTreeLeaf::EnumSpec { fqn };
 
-        match &mut include_args_builder.enum_specs {
-            Some(vec) => vec.push(enum_spec),
-            None => include_args_builder.enum_specs = Some(vec![enum_spec]),
-        }
+        include_args_builder
+            .spec_tree
+            .as_mut()
+            .expect("Expected spec_tree to be Some")
+            .push(enum_spec);
     }
 }
 
@@ -492,91 +460,265 @@ pub(crate) struct SourceFile {
     pub path_buf: PathBuf,
     pub ast: File,
     pub fqn: Path,
-    pub items: Vec<SourceFileItem>,
 }
 
-#[derive(Clone)]
-#[allow(dead_code)]
-pub(crate) enum SourceFileItem {
-    Struct(String),
-    Enum(String),
-}
+/// Contains data structures and functions to collect and operate on a tree
+/// of specificated structs and enums.
+pub(crate) mod spec_tree {
+    use std::collections::hash_map::Entry;
+    use std::collections::HashMap;
+    use std::iter::Peekable;
 
-#[derive(Clone)]
-pub(crate) struct StructSpec {
-    pub fqn: Path,
-    pub fields: Vec<Ident>,
-}
+    use proc_macro2::Span;
+    use proc_macro_error::abort;
+    use syn::punctuated::Punctuated;
+    use syn::Ident;
+    use syn::Path;
+    use syn::PathSegment;
 
-#[derive(Clone)]
-pub(crate) struct EnumSpec {
-    pub fqn: Path,
-}
-
-pub(crate) mod traverse {
-    use syn::visit;
-    use syn::visit::Visit;
-    use syn::ItemEnum;
-    use syn::ItemMod;
-    use syn::ItemStruct;
-
-    /// Custom visitor to collect paths to all structs and enums.
-    struct CollectPaths {
-        current_path: Vec<String>,
-        paths: Vec<super::SourceFileItem>,
+    #[derive(Clone, Debug)]
+    #[allow(dead_code)]
+    // Probably, the better way will be to separate SpecTreeNode variants into
+    // separate enum, and leave the common `fqn` field present in a parent struct,
+    // but this will complicate the consequent processing, as `fqn` is also used
+    // when comparing the struct specs with struct AST from the parsed files.
+    pub(crate) enum SpecTreeLeaf {
+        StructSpec { fqn: Path, fields: Vec<Ident> },
+        EnumSpec { fqn: Path },
     }
 
-    impl CollectPaths {
-        fn new() -> Self {
-            CollectPaths {
-                current_path: Vec::new(),
-                paths: Vec::new(),
+    impl SpecTreeLeaf {
+        pub fn fqn_ref(&self) -> &Path {
+            match self {
+                SpecTreeLeaf::StructSpec { ref fqn, .. } => fqn,
+                SpecTreeLeaf::EnumSpec { ref fqn } => fqn,
             }
         }
     }
 
-    impl<'ast> Visit<'ast> for CollectPaths {
-        fn visit_item_struct(&mut self, item: &'ast ItemStruct) {
-            let ident = item.ident.to_string();
-            self.paths.push(super::SourceFileItem::Struct(
-                self.current_path
-                    .iter()
-                    .chain([ident].iter())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join("::"),
-            ));
-            visit::visit_item_struct(self, item);
+    #[derive(Clone, Debug)]
+    pub(crate) struct SpecTreeNode {
+        pub fqn: Path,
+        pub nodes: HashMap<String, SpecTreeNode>,
+        pub leafs: HashMap<String, SpecTreeLeaf>,
+    }
+
+    impl SpecTreeNode {
+        /// Returns a new empty SpecTree
+        pub fn new() -> Self {
+            SpecTreeNode {
+                fqn: Path {
+                    leading_colon: None,
+                    segments: Punctuated::new(),
+                },
+                nodes: HashMap::new(),
+                leafs: HashMap::new(),
+            }
         }
 
-        fn visit_item_enum(&mut self, item: &'ast ItemEnum) {
-            let ident = item.ident.to_string();
-            self.paths.push(super::SourceFileItem::Enum(
-                self.current_path
-                    .iter()
-                    .chain([ident].iter())
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join("::"),
-            ));
-            visit::visit_item_enum(self, item);
-        }
-
-        fn visit_item_mod(&mut self, item: &'ast ItemMod) {
-            if let Some(content) = &item.content {
-                self.current_path.push(item.ident.to_string());
-                for item in &content.1 {
-                    self.visit_item(item);
+        /// Returns a mutable reference to a child SpecTreeNode with `ident` key.
+        /// If no such node if present, it is created.
+        pub fn child(&mut self, ident: String) -> &mut SpecTreeNode {
+            match self.nodes.entry(ident.clone()) {
+                Entry::Occupied(node) => node.into_mut(),
+                Entry::Vacant(vacant_node) => {
+                    let mut child = SpecTreeNode {
+                        fqn: self.fqn.clone(),
+                        nodes: HashMap::new(),
+                        leafs: HashMap::new(),
+                    };
+                    child.fqn.segments.push(PathSegment {
+                        ident: Ident::new(ident.as_ref(), Span::call_site()),
+                        arguments: syn::PathArguments::None,
+                    });
+                    vacant_node.insert(child)
                 }
-                self.current_path.pop();
             }
-            visit::visit_item_mod(self, item);
+        }
+
+        /// Pushes the SpecTreeNode into SpecTree, creating necessary module
+        /// specs along the path; path is fully-qualified struct or enum name,
+        /// specified from the root module (see `with_orig_mod` argument), e.g.
+        /// `root::child::StructA`
+        pub fn push(&mut self, spec_tree_leaf: SpecTreeLeaf) -> &mut Self {
+            let mut path_vec: Vec<_> = spec_tree_leaf
+                .fqn_ref()
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect();
+            let leaf_name = path_vec.pop().expect("Expected leaf fqn to be non-empty");
+            let mut path = path_vec.into_iter().peekable();
+
+            push_recursive(self, &mut path, leaf_name, spec_tree_leaf);
+
+            return self;
+
+            fn push_recursive(
+                node: &mut SpecTreeNode,
+                path: &mut Peekable<impl Iterator<Item = String>>,
+                leaf_name: String,
+                spec_tree_leaf: SpecTreeLeaf,
+            ) {
+                if path.peek().is_none() {
+                    if node.leafs.contains_key(&leaf_name) {
+                        abort!(spec_tree_leaf.fqn_ref(), "Duplicate specs are not allowed")
+                    }
+                    node.leafs.insert(leaf_name, spec_tree_leaf);
+                } else {
+                    let ident = path.next().unwrap();
+                    push_recursive(node.child(ident), path, leaf_name, spec_tree_leaf);
+                }
+            }
+        }
+
+        pub fn get_leaf(&self, path: impl IntoIterator<Item = String>) -> Option<&SpecTreeLeaf> {
+            let mut path_vec: Vec<String> = path.into_iter().collect();
+            let leaf_name = path_vec.pop()?;
+            let mut path = path_vec.into_iter().peekable();
+
+            return get_recursive(self, &mut path, leaf_name);
+
+            fn get_recursive<'a>(
+                node: &'a SpecTreeNode,
+                path_iter: &mut Peekable<impl Iterator<Item = String>>,
+                leaf_name: String,
+            ) -> Option<&'a SpecTreeLeaf> {
+                if let Some(ident) = path_iter.next() {
+                    if node.nodes.contains_key(&ident) {
+                        get_recursive(node.nodes.get(&ident).unwrap(), path_iter, leaf_name)
+                    } else {
+                        None
+                    }
+                } else {
+                    node.leafs
+                        .contains_key(&leaf_name)
+                        .then(|| node.leafs.get(&leaf_name).unwrap())
+                }
+            }
         }
     }
 
-    pub(crate) fn collect_structs_and_enums(file: &syn::File) -> Vec<super::SourceFileItem> {
-        let mut collector = CollectPaths::new();
-        collector.visit_file(file);
-        collector.paths
+    #[cfg(test)]
+    pub(crate) mod tests {
+        use syn::parse_str;
+
+        use super::*;
+
+        #[test]
+        fn push_single() {
+            let mut tree = SpecTreeNode::new();
+            let node = SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA").unwrap(),
+                fields: Vec::new(),
+            };
+            tree.push(node);
+
+            assert!(tree
+                .get_leaf(vec![
+                    "root".to_string(),
+                    "child".to_string(),
+                    "StructA".to_string()
+                ])
+                .is_some());
+        }
+
+        #[test]
+        fn push_multiple() {
+            let mut tree = SpecTreeNode::new();
+            tree.push(SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA").unwrap(),
+                fields: Vec::new(),
+            })
+            .push(SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::EnumA").unwrap(),
+                fields: Vec::new(),
+            });
+
+            assert!(tree
+                .get_leaf(vec![
+                    "root".to_string(),
+                    "child".to_string(),
+                    "StructA".to_string()
+                ])
+                .is_some());
+            assert!(tree
+                .get_leaf(vec![
+                    "root".to_string(),
+                    "child".to_string(),
+                    "EnumA".to_string()
+                ])
+                .is_some());
+        }
+
+        #[test]
+        fn push_conflict() {
+            let mut tree = SpecTreeNode::new();
+            tree.push(SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA").unwrap(),
+                fields: Vec::new(),
+            })
+            .push(SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA::Whatever").unwrap(),
+                fields: Vec::new(),
+            });
+
+            assert!(tree
+                .get_leaf(vec![
+                    "root".to_string(),
+                    "child".to_string(),
+                    "StructA".to_string()
+                ])
+                .is_some());
+            assert!(tree
+                .get_leaf(vec![
+                    "root".to_string(),
+                    "child".to_string(),
+                    "StructA".to_string(),
+                    "Whatever".to_string()
+                ])
+                .is_some());
+        }
+
+        #[test]
+        fn get_non_existent() {
+            let tree = SpecTreeNode::new();
+
+            assert!(tree
+                .get_leaf(vec![
+                    "root".to_string(),
+                    "child".to_string(),
+                    "EnumA".to_string()
+                ])
+                .is_none());
+        }
+
+        #[test]
+        fn get_module() {
+            let mut tree = SpecTreeNode::new();
+            let node = SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA").unwrap(),
+                fields: Vec::new(),
+            };
+            tree.push(node);
+
+            assert!(tree
+                .get_leaf(vec!["root".to_string(), "child".to_string()])
+                .is_none());
+        }
+
+        #[test]
+        #[should_panic]
+        fn push_diplicate_panic() {
+            let mut tree = SpecTreeNode::new();
+            tree.push(SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA").unwrap(),
+                fields: Vec::new(),
+            })
+            .push(SpecTreeLeaf::StructSpec {
+                fqn: parse_str("root::child::StructA").unwrap(),
+                fields: Vec::new(),
+            });
+        }
     }
 }

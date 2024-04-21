@@ -1,0 +1,5 @@
+error: Duplicate specs are not allowed
+  --> tests/ui/with_enum_duplicate.rs:12:16
+   |
+12 |     .with_enum(B)
+   |                ^

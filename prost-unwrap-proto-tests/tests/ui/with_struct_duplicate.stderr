@@ -1,0 +1,5 @@
+error: Duplicate specs are not allowed
+  --> tests/ui/with_struct_duplicate.rs:12:18
+   |
+12 |     .with_struct(A, [])
+   |                  ^

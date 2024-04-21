@@ -11,7 +11,7 @@ keywords = ["protobuf", "grpc", "prost", "tonic"]
 categories = ["data-structures", "rust-patterns"]
 
 [workspace]
-default-members = ["prost-unwrap-proto-tests"]
+default-members = ["prost-unwrap-proto-tests", "prost-unwrap-core"]
 members = [
   "prost-unwrap-transform",
   "prost-unwrap-core",

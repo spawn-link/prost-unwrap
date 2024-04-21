@@ -4,10 +4,19 @@ package root;
 
 message A {
   int32 f1 = 1;
-  string f2 = 2;
+  B f2 = 2;
 }
 
 enum B {
   DEFAULT = 0;
   NON_DEFAULT = 1;
+}
+
+message C { A f1 = 1; }
+
+message D {
+  oneof f1 {
+    A a = 1;
+    C c = 2;
+  }
 }
