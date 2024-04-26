@@ -13,7 +13,6 @@ prost-unwrap = { path = ".." }
 trybuild = "1.0.91"
 
 [build-dependencies]
-prost = "0.12.4"
 prost-build = "0.12"
 
 [features]

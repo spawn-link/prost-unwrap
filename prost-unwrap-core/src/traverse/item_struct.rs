@@ -1,12 +1,8 @@
 use proc_macro_error::abort;
 use quote::quote;
-use syn::punctuated::Punctuated;
-use syn::Attribute;
 use syn::Fields;
 use syn::Item;
 use syn::ItemStruct;
-use syn::Meta;
-use syn::Token;
 
 use crate::include::spec_tree::SpecTreeLeaf;
 use crate::include::Config;
