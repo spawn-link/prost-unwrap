@@ -104,11 +104,9 @@ fn drop_prost_derives(attrs: &mut Vec<Attribute>) {
                 let filtered: Punctuated<Meta, Token![,]> = nested
                     .into_iter()
                     .filter(|meta| match meta {
-                        Meta::Path(path) => {
-                            path.segments.first().map_or(true, |segment| {
-                                segment.ident.to_string() != "prost".to_string()
-                            }) && path.leading_colon.is_some()
-                        }
+                        Meta::Path(path) => path.segments.first().map_or(true, |segment| {
+                            segment.ident.to_string() != "prost".to_string()
+                        }),
                         _ => true,
                     })
                     .collect();
