@@ -2,21 +2,21 @@ syntax = "proto3";
 
 package root;
 
-message A {
+message MsgA {
   int32 f1 = 1;
-  B f2 = 2;
+  EnumB f2 = 2;
 }
 
-enum B {
+enum EnumB {
   DEFAULT = 0;
   NON_DEFAULT = 1;
 }
 
-message C { A f1 = 1; }
+message MsgC { MsgA f1 = 1; }
 
-message D {
+message MsgD {
   oneof f1 {
-    A a = 1;
-    C c = 2;
+    MsgA a = 1;
+    MsgC c = 2;
   }
 }

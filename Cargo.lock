@@ -355,6 +355,7 @@ dependencies = [
 name = "prost-unwrap-proto-tests"
 version = "0.0.0"
 dependencies = [
+ "prost",
  "prost-build",
  "prost-unwrap",
  "trybuild",

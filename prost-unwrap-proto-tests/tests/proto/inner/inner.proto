@@ -6,5 +6,5 @@ import "root.proto";
 
 message A {
   int32 f1 = 1;
-  root.A f2 = 2;
+  root.MsgA f2 = 2;
 }
