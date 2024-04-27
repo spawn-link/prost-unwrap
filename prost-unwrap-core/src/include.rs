@@ -612,11 +612,11 @@ pub(crate) mod spec_tree {
                 .map(|segment| segment.ident.to_string())
                 .collect();
             let leaf_name = path_vec.pop().expect("Expected leaf fqn to be non-empty");
-            let mut path = path_vec.into_iter().peekable();
+            let path = path_vec.into_iter().peekable();
 
             let mut current_node = &mut self.inner;
 
-            while let Some(ident) = path.next() {
+            for ident in path {
                 current_node = current_node.child(ident);
             }
 
@@ -628,7 +628,7 @@ pub(crate) mod spec_tree {
                     vacant.insert(spec_tree_leaf);
                 }
             }
-            return self;
+            self
         }
 
         pub fn get_leaf<'tree, 'path, 'leaf>(
@@ -640,11 +640,11 @@ pub(crate) mod spec_tree {
         {
             let mut path_vec: Vec<_> = path.into_iter().collect();
             let leaf_name = path_vec.pop()?;
-            let mut path = path_vec.into_iter().peekable();
+            let path = path_vec.into_iter().peekable();
 
             let mut current_node = &self.inner;
 
-            while let Some(ident) = path.next() {
+            for ident in path {
                 current_node = current_node.nodes.get(ident)?;
             }
 

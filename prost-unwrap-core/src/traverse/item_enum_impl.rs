@@ -37,7 +37,7 @@ const IMPL_BLOCK_TRY_FROM_ORIGINAL_FOOTER: &str = "})}}";
 fn generate_try_from_original(
     config: &Config,
     item: &ItemEnum,
-    ident_stack: &mut Vec<String>,
+    ident_stack: &mut [String],
 ) -> Vec<Item> {
     let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
     let error_typepath = config.this_item_typepath([super::items::ERROR_STRUCT_NAME.to_string()]);
@@ -90,7 +90,7 @@ const IMPL_BLOCK_INTO_ORIGINAL_FOOTER: &str = "}}}";
 fn generate_into_original(
     config: &Config,
     item: &ItemEnum,
-    ident_stack: &mut Vec<String>,
+    ident_stack: &mut [String],
 ) -> Vec<Item> {
     let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
 

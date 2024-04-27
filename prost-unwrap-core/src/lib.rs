@@ -42,5 +42,5 @@ use crate::traverse::*;
 pub fn include(_item: TokenStream) -> TokenStream {
     let config = parse2::<Config>(_item).unwrap();
     let ast = traverse::copy_unwrapped(&config);
-    quote!(#ast).into()
+    quote!(#ast)
 }

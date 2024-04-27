@@ -73,16 +73,15 @@ impl Traverse for Struct {
                             required_fields.remove(&field_name);
                         }
 
-                        if !required_fields.is_empty() {
-                            for (field_name, field_ident) in required_fields {
-                                abort!(
-                                    field_ident,
-                                    format!(
-                                        "Required field missing from struct definition: {}",
-                                        field_name
-                                    )
+                        if let Some((field_name, field_ident)) = required_fields.into_iter().next()
+                        {
+                            abort!(
+                                field_ident,
+                                format!(
+                                    "Required field missing from struct definition: {}",
+                                    field_name
                                 )
-                            }
+                            )
                         }
 
                         Item::Struct(mirror_struct)

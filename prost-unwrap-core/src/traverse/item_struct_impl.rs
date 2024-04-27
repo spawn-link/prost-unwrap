@@ -45,7 +45,7 @@ const IMPL_BLOCK_TRY_FROM_ORIGINAL_FOOTER: &str = "})}}";
 fn generate_try_from_original(
     config: &Config,
     item: &ItemStruct,
-    ident_stack: &mut Vec<String>,
+    ident_stack: &mut [String],
 ) -> Vec<Item> {
     let mirror_struct_path = ident_stack
         .iter()
@@ -176,7 +176,7 @@ const IMPL_BLOCK_INTO_ORIGINAL_FOOTER: &str = "}}}";
 fn generate_into_original(
     config: &Config,
     item: &ItemStruct,
-    ident_stack: &mut Vec<String>,
+    ident_stack: &mut [String],
 ) -> Vec<Item> {
     let mirror_struct_path = ident_stack
         .iter()

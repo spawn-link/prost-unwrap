@@ -34,12 +34,11 @@ pub(crate) fn copy_unwrapped(config: &Config) -> File {
     items.extend(items::item_convert_vec_into());
     items.extend(copy_unwrapped_items(config, &mut ident_stack, &ast.items));
 
-    let file = File {
+    File {
         shebang: None,
         attrs: Vec::new(),
         items,
-    };
-    file
+    }
 }
 
 fn copy_unwrapped_items<'a, I: IntoIterator<Item = &'a Item>>(
@@ -104,9 +103,10 @@ fn drop_prost_derives(attrs: &mut Vec<Attribute>) {
                 let filtered: Punctuated<Meta, Token![,]> = nested
                     .into_iter()
                     .filter(|meta| match meta {
-                        Meta::Path(path) => path.segments.first().map_or(true, |segment| {
-                            segment.ident.to_string() != "prost".to_string()
-                        }),
+                        Meta::Path(path) => path
+                            .segments
+                            .first()
+                            .map_or(true, |segment| segment.ident != *"prost"),
                         _ => true,
                     })
                     .collect();
