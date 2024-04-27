@@ -159,6 +159,7 @@ pub(crate) mod items {
     use syn::ItemImpl;
     use syn::ItemStruct;
 
+    pub const ERROR_STRUCT_NAME: &str = "Error";
     pub(crate) fn item_error() -> Vec<Item> {
         const DEF_BLOCK: &str = r#"
             #[derive(Debug)]

@@ -64,7 +64,8 @@ fn generate_try_from_original(
     let ret = match item.fields {
         Fields::Named(ref fields) => {
             let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
-            let error_typepath = config.error_typepath();
+            let error_typepath =
+                config.this_item_typepath([super::items::ERROR_STRUCT_NAME.to_string()]);
 
             let mut try_from_impl = vec![strfmt!(
                 IMPL_BLOCK_TRY_FROM_ORIGINAL_HEADER,

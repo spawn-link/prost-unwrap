@@ -61,7 +61,7 @@ jobs:
           tool: protoc@${{ env.PROTOC_VERSION }}
       - uses: Swatinem/rust-cache@v2
       - name: test
-        run: cargo test trybuild --features=ui-tests
+        run: cargo test ui --features=ui-tests
 
   test:
     runs-on: ${{ matrix.os }}

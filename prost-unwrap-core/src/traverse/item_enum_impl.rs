@@ -40,7 +40,7 @@ fn generate_try_from_original(
     ident_stack: &mut Vec<String>,
 ) -> Vec<Item> {
     let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
-    let error_typepath = config.error_typepath();
+    let error_typepath = config.this_item_typepath([super::items::ERROR_STRUCT_NAME.to_string()]);
 
     let mut try_from_impl_str = strfmt!(
         IMPL_BLOCK_TRY_FROM_ORIGINAL_HEADER,
@@ -93,13 +93,11 @@ fn generate_into_original(
     ident_stack: &mut Vec<String>,
 ) -> Vec<Item> {
     let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
-    let error_typepath = config.error_typepath();
 
     let mut try_from_impl_str = strfmt!(
         IMPL_BLOCK_INTO_ORIGINAL_HEADER,
         item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
-        struct_name => item.ident.to_string(),
-        error_fqn => quote!(#error_typepath).to_string()
+        struct_name => item.ident.to_string()
     )
     .unwrap();
 

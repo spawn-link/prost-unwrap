@@ -74,13 +74,15 @@ impl Traverse for Struct {
                         }
 
                         if !required_fields.is_empty() {
-                            abort!(
-                                struct_leaf.fqn_ref(),
-                                format!(
-                                    "Required fields missing from struct definition: {}",
-                                    required_fields.into_keys().collect::<Vec<_>>().join(", ")
+                            for (field_name, field_ident) in required_fields {
+                                abort!(
+                                    field_ident,
+                                    format!(
+                                        "Required field missing from struct definition: {}",
+                                        field_name
+                                    )
                                 )
-                            )
+                            }
                         }
 
                         Item::Struct(mirror_struct)

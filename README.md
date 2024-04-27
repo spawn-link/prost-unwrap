@@ -159,14 +159,12 @@ fn b(msg: crate::generated::foo::bar::MsgB)
 Take a look at the [integration tests](prost-unwrap-proto-tests/tests/)
 directory to find another use cases. Note:
 [ui](prost-unwrap-proto-tests/tests/ui/) directory contains negative (failing)
-tests, do not use those! :)
+tests, do not consider those! :)
 
 ### `include!` macro breakdown
 
 The `include!` macro takes a pseudocode, in a form of method call chain, as an
-argument. The pseudo-method calls may be arranged in any order, but the most
-readable way is to specify absolute paths first, then the source file, and a
-number of structs and enums specs in the end.
+argument. The pseudo-method calls may be arranged in any order.
 
 The call chain must contain one call of `with_original_mod`, `with_this_mod` and
 `from_source`. At least one `with_struct` or `with_enum` must present as well.
@@ -269,7 +267,8 @@ One can always inspect the generated code using the
 - Useless `with_enum` options: since `prost-unwrap` copies all structs and
   enums, this option is useless until partial copying is implemented.
 - Copied structs and enums lack `Debug` and `Default` trait implementations
-  (these are provided by prost `Message` and `Enumeration`, which are stripped).
+  (these are provided by prost `Message` and `Enumeration` derives, which are
+  stripped).
 - Tests do not cover all possible usage scenarios.
 
 ### Contributing

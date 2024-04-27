@@ -460,32 +460,30 @@ impl Config {
 
 impl Config {
     pub fn orig_item_typepath<I: IntoIterator<Item = String>>(&self, ident_path: I) -> Path {
-        let path = self.orig_mod_path.clone();
-        self.item_typepath(path, ident_path)
+        let absolute_part = self.orig_mod_path.clone();
+        self.item_typepath(absolute_part, ident_path)
     }
 
     pub fn this_item_typepath<I: IntoIterator<Item = String>>(&self, ident_path: I) -> Path {
-        let path = self.this_mod_path.clone();
-        self.item_typepath(path, ident_path)
-    }
-
-    pub fn error_typepath<'a>(&self) -> Path {
-        let path = self.this_mod_path.clone();
-        self.item_typepath(path, vec!["Error".to_string()])
+        let absolute_part = self.this_mod_path.clone();
+        self.item_typepath(absolute_part, ident_path)
     }
 
     fn item_typepath<I: IntoIterator<Item = String>>(
         &self,
-        mut mod_path: Path,
+        mut absolute_part: Path,
         ident_path: I,
     ) -> Path {
+        for ident in self.source.fqn.segments.iter() {
+            absolute_part.segments.push(ident.clone());
+        }
         for ident in ident_path {
-            mod_path.segments.push(syn::PathSegment {
+            absolute_part.segments.push(syn::PathSegment {
                 ident: Ident::new(ident.as_str(), Span::call_site()),
                 arguments: syn::PathArguments::None,
             });
         }
-        mod_path
+        absolute_part
     }
 }
 
