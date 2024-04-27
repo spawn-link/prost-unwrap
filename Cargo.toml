@@ -11,7 +11,13 @@ keywords = ["protobuf", "grpc", "prost", "tonic"]
 categories = ["data-structures", "rust-patterns"]
 
 [workspace]
-members = ["prost-unwrap-transform", "prost-unwrap-core"]
+default-members = ["prost-unwrap-proto-tests", "prost-unwrap-core"]
+members = [
+  "prost-unwrap-transform",
+  "prost-unwrap-core",
+  "prost-unwrap-proto-tests",
+]
+exclude = ["prost-unwrap-proto-tests"]
 
 [dependencies]
-prost-unwrap-transform = { version = "0.1.2", path = "prost-unwrap-transform" }
+prost-unwrap-transform = { version = "0.1.5", path = "prost-unwrap-transform" }

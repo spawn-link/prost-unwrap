@@ -8,4 +8,4 @@
 )]
 #![doc = include_str!("../README.md")]
 
-pub use prost_unwrap_transform::required;
+pub use prost_unwrap_transform::include;

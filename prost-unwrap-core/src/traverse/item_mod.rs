@@ -1,9 +1,7 @@
-use syn::token::Brace;
-use syn::Error;
 use syn::Item;
 use syn::ItemMod;
 
-use crate::macro_args::MacroArgs;
+use crate::include::Config;
 use crate::Traverse;
 
 pub struct Mod;
@@ -11,47 +9,24 @@ pub struct Mod;
 impl Traverse for Mod {
     type Item = ItemMod;
 
-    fn traverse(
-        args: &MacroArgs,
-        item: &Self::Item,
-        mod_stack: &mut Vec<String>,
-    ) -> super::TraverseCallbackRet {
-        let mut mirror_mod = item.clone();
-        mod_stack.push(mirror_mod.ident.to_string());
+    fn traverse(config: &Config, item: &Self::Item, ident_stack: &mut Vec<String>) -> Vec<Item> {
+        ident_stack.push(item.ident.to_string());
 
-        mirror_mod.content = item
-            .content
-            .as_ref()
-            .map(|(brace, sub_items)| fold_sub_items(args, mod_stack, brace, sub_items))
-            .transpose()?;
+        let ret = if let Some((brace, ref sub_items)) = item.content {
+            let copied_content = super::copy_unwrapped_items(config, ident_stack, sub_items);
+            if !copied_content.is_empty() {
+                let mut copied_mod = item.clone();
+                copied_mod.content = Some((brace, copied_content));
+                vec![Item::Mod(copied_mod)]
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
 
-        mod_stack.pop();
+        ident_stack.pop();
 
-        Ok(vec![Item::Mod(mirror_mod)])
+        ret
     }
-}
-
-fn fold_sub_items(
-    args: &MacroArgs,
-    mod_stack: &mut Vec<String>,
-    brace: &Brace,
-    sub_items: &[Item],
-) -> Result<(Brace, Vec<Item>), Error> {
-    sub_items
-        .iter()
-        .try_fold((brace.to_owned(), Vec::new()), |acc, sub_item| {
-            process_sub_item(args, mod_stack, acc, sub_item)
-        })
-}
-
-fn process_sub_item(
-    args: &MacroArgs,
-    mod_stack: &mut Vec<String>,
-    acc: (Brace, Vec<Item>),
-    sub_item: &Item,
-) -> Result<(Brace, Vec<Item>), Error> {
-    let items = crate::copy_modified(args, sub_item, mod_stack)?;
-    let (brace, mut acc_items) = acc;
-    acc_items.extend(items);
-    Ok((brace, acc_items))
 }

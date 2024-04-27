@@ -1,5 +1,9 @@
 name: CI
 
+env:
+  # Using same version as prost
+  PROTOC_VERSION: 3.20.3
+
 on:
   push:
     branches: ["main", "release/*"]
@@ -21,6 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
@@ -34,6 +42,26 @@ jobs:
       - uses: taiki-e/install-action@cargo-machete
       - name: Check unused dependencies
         run: cargo machete
+
+  ui-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+    steps:
+      - uses: actions/checkout@v4
+      - name: install toolchain (${{ matrix.toolchain }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+      - name: test
+        run: cargo test ui --features=ui-tests
 
   test:
     runs-on: ${{ matrix.os }}
@@ -52,6 +80,10 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
       - uses: Swatinem/rust-cache@v2
       - name: test
         run: cargo test --all-targets

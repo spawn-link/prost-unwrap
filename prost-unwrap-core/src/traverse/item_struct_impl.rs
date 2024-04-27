@@ -1,43 +1,35 @@
-use proc_macro2::Span;
+use std::collections::HashMap;
+
+use proc_macro_error::abort;
 use quote::quote;
 use strfmt::strfmt;
-use syn::punctuated::Punctuated;
 use syn::Fields;
-use syn::Ident;
 use syn::Item;
 use syn::ItemImpl;
 use syn::ItemStruct;
-use syn::Path;
-use syn::PathArguments;
-use syn::PathSegment;
-use syn::Token;
-use syn::TypePath;
 
-use crate::macro_args::MacroArgs;
-use crate::Traverse;
+use crate::include::spec_tree::SpecTreeLeaf;
+use crate::include::Config;
+use crate::traverse::Traverse;
 
 pub struct StructImpl;
 
 impl Traverse for StructImpl {
     type Item = ItemStruct;
 
-    fn traverse(
-        args: &MacroArgs,
-        item: &Self::Item,
-        mod_stack: &mut Vec<String>,
-    ) -> crate::TraverseCallbackRet {
+    fn traverse(config: &Config, item: &Self::Item, ident_stack: &mut Vec<String>) -> Vec<Item> {
         let mut vec = Vec::with_capacity(2);
-        vec.extend(generate_try_from_original(args, item, mod_stack)?);
-        vec.extend(generate_into_original(args, item, mod_stack)?);
-        Ok(vec)
+        vec.extend(generate_try_from_original(config, item, ident_stack));
+        vec.extend(generate_into_original(config, item, ident_stack));
+        vec
     }
 }
 
 const IMPL_BLOCK_TRY_FROM_ORIGINAL_HEADER: &str = r#"
-    impl std::convert::TryFrom<{item_struct_ty_path}> for {struct_name} {{
-        type Error = {error_fqn};
+    impl std::convert::TryFrom<{orig_item_typepath}> for {struct_name} {{
+        type Error = {error_typepath};
 
-        fn try_from(value: {item_struct_ty_path}) -> Result<Self, Self::Error> {{
+        fn try_from(value: {orig_item_typepath}) -> Result<Self, Self::Error> {{
             Ok(Self {{
 "#;
 const IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_AS_IS: &str = "{field_name}: value.{field_name},";
@@ -51,75 +43,128 @@ const IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_UNWRAPPED: &str = r#"
 const IMPL_BLOCK_TRY_FROM_ORIGINAL_FOOTER: &str = "})}}";
 
 fn generate_try_from_original(
-    args: &MacroArgs,
-    item_struct: &ItemStruct,
-    mod_stack: &mut [String],
-) -> super::TraverseCallbackRet {
-    let mirror_struct_fqn = format!("{}.{}", mod_stack.join("."), item_struct.ident);
+    config: &Config,
+    item: &ItemStruct,
+    ident_stack: &mut [String],
+) -> Vec<Item> {
+    let mirror_struct_path = ident_stack
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
 
-    let required_fields = args
-        .affected_structs
-        .get(&mirror_struct_fqn)
-        .cloned()
-        .unwrap_or(Vec::new());
+    let required_fields = match config.spec_tree.get_leaf(&mirror_struct_path) {
+        Some(_struct_leaf @ SpecTreeLeaf::Struct(struct_spec)) => struct_spec.fields_map(),
+        Some(enum_leaf @ SpecTreeLeaf::Enum { .. }) => abort!(
+            enum_leaf.fqn_ref(),
+            "Expected specified item to be enum, but struct found"
+        ),
+        None => HashMap::new(),
+    };
 
-    match item_struct.fields {
+    let ret = match item.fields {
         Fields::Named(ref fields) => {
-            let item_ty_path = item_struct_typepath(mod_stack, item_struct);
-            let error_ty_path = crate::type_path::error_typepath(mod_stack);
+            let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
+            let error_typepath =
+                config.this_item_typepath([super::items::ERROR_STRUCT_NAME.to_string()]);
 
-            let mut try_from_impl_str = strfmt!(
+            let mut try_from_impl = vec![strfmt!(
                 IMPL_BLOCK_TRY_FROM_ORIGINAL_HEADER,
-                item_struct_ty_path => quote!(#item_ty_path).to_string(),
-                struct_name => item_struct.ident.to_string(),
-                error_fqn => quote!(#error_ty_path).to_string()
+                struct_name => item.ident.to_string(),
+                orig_item_typepath => quote!(#orig_item_typepath).to_string(),
+                error_typepath => quote!(#error_typepath).to_string()
             )
-            .unwrap();
+            .unwrap()];
 
             for field in &fields.named {
-                if required_fields.contains(&field.ident.as_ref().unwrap().to_string()) {
-                    try_from_impl_str += &strfmt!(
-                        IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_UNWRAPPED,
-                        field_name => field.ident.as_ref().unwrap().to_string(),
-                        mirror_struct_fqn => mirror_struct_fqn.clone()
-                    )
-                    .unwrap();
-                } else if crate::type_path::is_std_option_type(&field.ty) {
-                    try_from_impl_str += &strfmt!(
-                            IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_CONVERTED,
-                            field_name => field.ident.as_ref().unwrap().to_string(),
-                            convert_function_path => item_function_path_string(mod_stack, crate::FUNCTION_NAME_CONVERT_OPTION_TRY_FROM)
-                        )
-                        .unwrap();
-                } else if crate::type_path::is_std_vec_type(&field.ty) {
-                    try_from_impl_str += &strfmt!(
-                            IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_CONVERTED,
-                            field_name => field.ident.as_ref().unwrap().to_string(),
-                            convert_function_path => item_function_path_string(mod_stack, crate::FUNCTION_NAME_CONVERT_VEC_TRY_FROM)
-                        )
-                        .unwrap();
-                } else {
-                    try_from_impl_str += &strfmt!(
-                        IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_AS_IS,
-                        field_name => field.ident.as_ref().unwrap().to_string()
-                    )
-                    .unwrap();
+                let field_name = field
+                    .ident
+                    .as_ref()
+                    .expect("Expected field ident to be Some")
+                    .to_string();
+                let is_required_field = required_fields.contains_key(&field_name);
+                let is_std_option_type = super::is_std_option_type(&field.ty);
+                let is_std_vec_type = super::is_std_vec_type(&field.ty);
+
+                match (is_required_field, is_std_option_type, is_std_vec_type) {
+                    // field is required, is an Option<T>, unwrap it
+                    (true, true, _) => {
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_UNWRAPPED,
+                                field_name => field.ident.as_ref().unwrap().to_string(),
+                                mirror_struct_fqn => mirror_struct_path.join("::")
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    // field is required, but is not an Option<T>, throw an error
+                    (true, false, _) => {
+                        let ty = &field.ty;
+                        abort!(
+                            required_fields.get(&field_name).unwrap(),
+                            format!(
+                                "Field has type `{}`, which is not an Option<T> type",
+                                quote!(#ty)
+                            )
+                        );
+                    }
+                    // field is not required, but is an Option<T>: convert with a function call
+                    (_, true, _) => {
+                        let convert_fn_typepath = config.this_item_typepath(vec![
+                            super::items::FUNCTION_NAME_CONVERT_OPTION_TRY_FROM.to_string(),
+                        ]);
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_CONVERTED,
+                                field_name => field_name,
+                                convert_function_path => quote!(#convert_fn_typepath).to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    // field is not required, but is a Vec<T>: convert with a function call
+                    (_, _, true) => {
+                        let convert_fn_typepath = config.this_item_typepath(vec![
+                            super::items::FUNCTION_NAME_CONVERT_VEC_TRY_FROM.to_string(),
+                        ]);
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_CONVERTED,
+                                field_name => field_name,
+                                convert_function_path => quote!(#convert_fn_typepath).to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    // field is not required, not an Option<T> nor Vec<T>: pass as is
+                    (_, _, _) => {
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_AS_IS,
+                                field_name => field_name
+                            )
+                            .unwrap(),
+                        );
+                    }
                 }
             }
 
-            try_from_impl_str += IMPL_BLOCK_TRY_FROM_ORIGINAL_FOOTER;
-            let try_from_impl_block: ItemImpl = syn::parse_str(&try_from_impl_str).unwrap();
+            try_from_impl.push(IMPL_BLOCK_TRY_FROM_ORIGINAL_FOOTER.to_string());
+            let try_from_impl_block: ItemImpl =
+                syn::parse_str(try_from_impl.join("").as_str()).unwrap();
 
-            Ok(vec![Item::Impl(try_from_impl_block)])
+            vec![Item::Impl(try_from_impl_block)]
         }
-        _ => Ok(vec![]),
-    }
+        _ => vec![],
+    };
+
+    ret
 }
 
 const IMPL_BLOCK_INTO_ORIGINAL_HEADER: &str = r#"
-    impl std::convert::Into<{item_struct_ty_path}> for {struct_name} {{
-        fn into(self) -> {item_struct_ty_path} {{
-            {item_struct_ty_path} {{
+    impl std::convert::Into<{orig_item_typepath}> for {struct_name} {{
+        fn into(self) -> {orig_item_typepath} {{
+            {orig_item_typepath} {{
 "#;
 const IMPL_BLOCK_INTO_ORIGINAL_FIELD_AS_IS: &str = "{field_name}: self.{field_name}.into(),";
 const IMPL_BLOCK_INTO_ORIGINAL_FIELD_CONVERTED: &str =
@@ -129,115 +174,116 @@ const IMPL_BLOCK_INTO_ORIGINAL_FIELD_WRAPPED: &str =
 const IMPL_BLOCK_INTO_ORIGINAL_FOOTER: &str = "}}}";
 
 fn generate_into_original(
-    args: &MacroArgs,
-    item_struct: &ItemStruct,
-    mod_stack: &mut [String],
-) -> super::TraverseCallbackRet {
-    let mirror_struct_fqn = format!("{}.{}", mod_stack.join("."), item_struct.ident);
+    config: &Config,
+    item: &ItemStruct,
+    ident_stack: &mut [String],
+) -> Vec<Item> {
+    let mirror_struct_path = ident_stack
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
 
-    let required_fields = args
-        .affected_structs
-        .get(&mirror_struct_fqn)
-        .cloned()
-        .unwrap_or(Vec::new());
+    let required_fields = match config.spec_tree.get_leaf(&mirror_struct_path) {
+        Some(_struct_leaf @ SpecTreeLeaf::Struct(struct_spec)) => struct_spec.fields_map(),
+        Some(enum_leaf @ SpecTreeLeaf::Enum { .. }) => abort!(
+            enum_leaf.fqn_ref(),
+            "Expected specified item to be enum, but struct found"
+        ),
+        None => HashMap::new(),
+    };
 
-    match item_struct.fields {
+    let ret = match item.fields {
         Fields::Named(ref fields) => {
-            let item_ty_path = item_struct_typepath(mod_stack, item_struct);
+            let orig_item_typepath = config.orig_item_typepath(ident_stack.iter().cloned());
 
-            let mut try_from_impl_str = strfmt!(
+            let mut try_from_impl = vec![strfmt!(
                 IMPL_BLOCK_INTO_ORIGINAL_HEADER,
-                item_struct_ty_path => quote!(#item_ty_path).to_string(),
-                struct_name => item_struct.ident.to_string()
+                orig_item_typepath => quote!(#orig_item_typepath).to_string(),
+                struct_name => item.ident.to_string()
             )
-            .unwrap();
+            .unwrap()];
 
             for field in &fields.named {
-                if required_fields.contains(&field.ident.as_ref().unwrap().to_string()) {
-                    try_from_impl_str += &strfmt!(
-                        IMPL_BLOCK_INTO_ORIGINAL_FIELD_WRAPPED,
-                        field_name => field.ident.as_ref().unwrap().to_string()
-                    )
-                    .unwrap();
-                } else if crate::type_path::is_std_option_type(&field.ty) {
-                    try_from_impl_str += &strfmt!(
-                            IMPL_BLOCK_INTO_ORIGINAL_FIELD_CONVERTED,
-                            field_name => field.ident.as_ref().unwrap().to_string(),
-                            convert_function_path => item_function_path_string(mod_stack, crate::FUNCTION_NAME_CONVERT_OPTION_INTO)
-                        )
-                        .unwrap();
-                } else if crate::type_path::is_std_vec_type(&field.ty) {
-                    try_from_impl_str += &strfmt!(
-                            IMPL_BLOCK_INTO_ORIGINAL_FIELD_CONVERTED,
-                            field_name => field.ident.as_ref().unwrap().to_string(),
-                            convert_function_path => item_function_path_string(mod_stack, crate::FUNCTION_NAME_CONVERT_VEC_INTO)
-                        )
-                        .unwrap();
-                } else {
-                    try_from_impl_str += &strfmt!(
-                        IMPL_BLOCK_INTO_ORIGINAL_FIELD_AS_IS,
-                        field_name => field.ident.as_ref().unwrap().to_string()
-                    )
-                    .unwrap();
+                let field_name = field
+                    .ident
+                    .as_ref()
+                    .expect("Expected field ident to be Some")
+                    .to_string();
+                let is_required_field = required_fields.contains_key(&field_name);
+                let is_std_option_type = super::is_std_option_type(&field.ty);
+                let is_std_vec_type = super::is_std_vec_type(&field.ty);
+
+                match (is_required_field, is_std_option_type, is_std_vec_type) {
+                    // field is required and is an Option<T>, wrap it into Some()
+                    (true, true, _) => {
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_INTO_ORIGINAL_FIELD_WRAPPED,
+                                field_name => field.ident.as_ref().unwrap().to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    // field is required but is not an Option<T>, throw an error
+                    (true, false, _) => {
+                        let ty = &field.ty;
+                        abort!(
+                            required_fields.get(&field_name).unwrap(),
+                            format!(
+                                "Field has type `{}`, which is not an Option<T> type",
+                                quote!(#ty)
+                            )
+                        );
+                    }
+                    // field is not required but is an Option<T>, convert it with a function call
+                    (_, true, _) => {
+                        let convert_fn_typepath = config.this_item_typepath(vec![
+                            super::items::FUNCTION_NAME_CONVERT_OPTION_INTO.to_string(),
+                        ]);
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_INTO_ORIGINAL_FIELD_CONVERTED,
+                                field_name => field_name,
+                                convert_function_path => quote!(#convert_fn_typepath).to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    // field is not required but is a Vec<T>, convert it with a function call
+                    (_, _, true) => {
+                        let convert_fn_typepath = config.this_item_typepath(vec![
+                            super::items::FUNCTION_NAME_CONVERT_VEC_INTO.to_string(),
+                        ]);
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_INTO_ORIGINAL_FIELD_CONVERTED,
+                                field_name => field_name,
+                                convert_function_path => quote!(#convert_fn_typepath).to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    // field is not required, not an Option<T> nor Vec<T>, pass as is
+                    (_, _, _) => {
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_INTO_ORIGINAL_FIELD_AS_IS,
+                                field_name => field_name
+                            )
+                            .unwrap(),
+                        );
+                    }
                 }
             }
 
-            try_from_impl_str += IMPL_BLOCK_INTO_ORIGINAL_FOOTER;
-            let try_from_impl_block: ItemImpl = syn::parse_str(&try_from_impl_str).unwrap();
+            try_from_impl.push(IMPL_BLOCK_INTO_ORIGINAL_FOOTER.to_string());
+            let try_from_impl_block: ItemImpl =
+                syn::parse_str(try_from_impl.join("").as_str()).unwrap();
 
-            Ok(vec![Item::Impl(try_from_impl_block)])
+            vec![Item::Impl(try_from_impl_block)]
         }
-        _ => Ok(vec![]),
-    }
-}
-
-fn item_struct_typepath(mod_stack: &mut [String], item_struct: &ItemStruct) -> TypePath {
-    let super_segments = std::iter::repeat(PathSegment {
-        ident: Ident::new("super", Span::call_site()),
-        arguments: PathArguments::None,
-    })
-    .take(mod_stack.len() + 1); // +1 for the extra "super" needed, as mirror is wrapped
-
-    let mod_segments = mod_stack.iter().map(|mod_name| PathSegment {
-        ident: Ident::new(mod_name, Span::call_site()),
-        arguments: PathArguments::None,
-    });
-
-    let mut segments: Punctuated<PathSegment, Token![::]> = Punctuated::new();
-    segments.extend(super_segments);
-    segments.extend(mod_segments);
-    segments.push(PathSegment {
-        ident: item_struct.ident.clone(),
-        arguments: PathArguments::None,
-    });
-
-    // Construct the TypePath
-    TypePath {
-        qself: None,
-        path: Path {
-            leading_colon: None,
-            segments,
-        },
-    }
-}
-
-fn item_function_path_string(mod_stack: &mut [String], function_name: &str) -> String {
-    let super_segments = std::iter::repeat(PathSegment {
-        ident: Ident::new("super", Span::call_site()),
-        arguments: PathArguments::None,
-    })
-    .take(mod_stack.len());
-
-    let mut segments: Punctuated<PathSegment, Token![::]> = Punctuated::new();
-    segments.extend(super_segments);
-    segments.push(PathSegment {
-        ident: Ident::new(function_name, Span::call_site()),
-        arguments: PathArguments::None,
-    });
-
-    let path = Path {
-        leading_colon: None,
-        segments,
+        _ => vec![],
     };
-    quote!(#path).to_string()
+
+    ret
 }

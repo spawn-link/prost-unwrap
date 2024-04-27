@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package root;
+
+message MsgA {
+  int32 f1 = 1;
+  EnumB f2 = 2;
+}
+
+enum EnumB {
+  DEFAULT = 0;
+  NON_DEFAULT = 1;
+}
+
+message MsgC { MsgA f1 = 1; }
+
+message MsgD {
+  oneof f1 {
+    MsgA a = 1;
+    MsgC c = 2;
+  }
+}

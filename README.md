@@ -36,130 +36,249 @@ procedural macro to eliminate this boilerplate, automatically generating the
 necessary code, simplifying maintenance, and enabling you to focus on your
 application's logic.
 
-### How to
+### Quick start guide
 
-Here is an example protobuf file:
+Let's say we have a `bar.proto` file like this, located in the `./proto/foo`
+directory in your crate:
 
 ```proto
 syntax = "proto3";
+
 package foo.bar;
 
-message A {
+message MsgA {
     int32 f1 = 1;
 }
 
-message B {
-    A f1 = 1;
-    A f2 = 2;
-    repeated A f3 = 3;
+message MsgB {
+    MsgA f1 = 1;
+    MsgA f2 = 2;
+    repeated MsgA f3 = 3;
 }
 ```
 
-When working with prost-generated structs, it's a good practice to organize the
-generated code into nested modules that mirror your protobuf package structure.
-For the example above, you should encapsulate the generated Rust code as
-follows:
+First, generate a rust source code with [prost](https://crates.io/crates/prost)
+or [tonic](https://crates.io/crates/tonic). Please refer to the crates
+documentation for full explanation of building process.
 
-```rust
-pub mod foo {
-    pub mod bar {
-        // include generated code here
-    }
+This quick start guide will use `prost`.
+
+First, to use `prost-unwrap`, you need to specify the out directory for prost.
+This is needed because `prost-unwrap` needs to read these files to generate
+mirroring structs, and the `OUT_DIR` env variable is unavailable at the time
+procedural macro is expanded. To avoid commiting the generated code, add
+`.gitignore` file into out directory, with the `*.rs` entry.
+
+Add the `out_dir` call to the prost-build config in your `build.rs`.
+`tonic-build` offers similar option.
+
+```rust,ignore
+use std::path::Path;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let inner_proto = Path::new("proto/foo/bar.proto");
+    let include_dir = Path::new("proto");
+
+    prost_build::Config::new()
+        .out_dir(".proto_out")
+        .compile_protos(&[inner_proto], &[include_dir])?;
+
+    Ok(())
 }
 ```
 
-To leverage `prost-unwrap`, apply the `required` macro to the root module. The
-attribute will generate a mirror module alongside the specified root module.
+After running the `cargo build`, you should see the generated code (`foo.bar.rs`
+file) in the out directory.
 
-The `required` attribute required two arguments:
+When working with prost-generated structs, it is required to organize the
+generated code into nested modules that will mirror your protobuf package
+structure. For the example above, you should encapsulate the generated Rust code
+as follows (wrap all the generated code, including package modules, with
+`generated` module to isolate it).
 
-1. **Mirror Module Name:** The name of the module where the mirror structs will
-   be generated.
-2. **Fields Array:** An array of string literals specifying the fields to be
-   unwrapped from `Option`. To save space one can also specify multiple fields
-   of one struct in braces. The following parameters are equivalent:
-   - `["mod1.mod2.struct.field1", "mod1.mod2.struct.field2"]`
-   - `["mod1.mod2.struct.{field1, field2}"]`
-
-#### Unwrapping the fields
-
-For the example protobuf definition above:
-
-```rust
-#[prost_unwrap::required(mirror, ["foo.bar.B.f1"])]
-pub mod foo {
-    pub mod bar {
-        // include generated code here
-    }
-}
-```
-
-`prost-unwrap` will generate the mirror of every struct and enum it will find
-while traversing. All the fields found in attribute arguments will be unwrapped
-from `Option<T>` and will be typed as `T` instead, and everything else
-(including the structs and fields attributes) will be copied.
-
-The generated module (`mirror`) will be located inside the root module
-(`proto`), like this:
-
-```rust
-pub mod foo {
-    pub mod bar {
-        // include generated code here
-    }
-}
-pub mod mirror {
+```rust,ignore
+pub mod generated {
     pub mod foo {
         pub mod bar {
-            // ...
+            include!(".proto/foo.bar.rs"));
         }
     }
 }
 ```
 
-For the example protobuf file above the original struct
+For `prost-unwrap`-generated code we will add a separate module tree with the
+similar structure.
 
-```rust
-pub struct A {
-    pub f1: i32
-}
-pub struct B {
-    pub f1: Option<A>,
-    pub f2: Option<A>,
-    pub f3: Vec<A>
-}
-```
-
-The mirror structure will look like this:
-
-```rust
-pub struct A {
-    pub f1: i32
-}
-pub struct B {
-    pub f1: A,
-    pub f2: Option<A>,
-    pub f3: Vec<A>
+```rust,ignore
+pub mod unwrapped {
+    pub mod foo {
+        pub mod bar {
+            // insert the prost_unwrap:include! macro call here
+        }
+    }
 }
 ```
 
-#### Casting
+`prost-unwrap` provides the `include!` macro to include the generated code into
+your source. The macro takes an argument list in form of a method call chain.
 
-`prost-unwrap` will generate the following trait implementations for every
-struct and enum:
+```rust,ignore
+prost_unwrap:include!(
+    with_original_mod(crate::generated)
+    .with_this_mod(crate::unwrapped)
+    .from_source(foo::bar, ".proto/foo.bar.rs")
+    .with_struct(MsgB, [f1])
+);
+```
 
-- `TryFrom<OrigT> for MirrorT`, enabling you to cast original struct with
-  `try_into`.
-- `Into<OrigT> for MirrorT`, enabling you to cast mirror struct back to original
-  one with `into`.
+This configuration instructs prost-unwrap to:
 
-Refer to [`casting`](tests/casting.rs) tests for examples.
+- Extract structs and enums from the file `".proto/foo.bar.rs"`.
+- Copy the `MsgB` struct from `crate::generated::foo::bar`, converting the `f1`
+  field from `Option<T>` to `T`.
+- Generate the `TryFrom` and `Into` traits for all transferred structs and
+  enums.
 
-Repeated fields, which are represented with `Vec<OrigT>` type, will also be
-casted to `Vec<MirrorT>`.
+With the generated and unwrapped code, you can perform conversions like these:
 
-#### Errors
+```rust,ignore
+fn a(msg: crate::unwrapped::foo::bar::MsgB)
+-> crate::generated::foo::bar::MsgB
+{
+    msg.into() // Converts unwrapped struct back to the original form.
+}
 
-The `TryFrom` trait implementation might return an error. This error is also
-generated by `prost-unwrap`, and is located inside the mirror module root
-(`mirror::Error`).
+fn b(msg: crate::generated::foo::bar::MsgB)
+-> Result<crate::unwrapped::foo::bar::MsgB, Box<dyn Error>>
+{
+    msg.try_into()? // Attempts conversion, returning an error if the
+                    // 'msg.f1' field is 'None'.
+}
+```
+
+Take a look at the [integration tests](prost-unwrap-proto-tests/tests/)
+directory to find another use cases. Note:
+[ui](prost-unwrap-proto-tests/tests/ui/) directory contains negative (failing)
+tests, do not consider those! :)
+
+### `include!` macro breakdown
+
+The `include!` macro takes a pseudocode, in a form of method call chain, as an
+argument. The pseudo-method calls may be arranged in any order.
+
+The call chain must contain one call of `with_original_mod`, `with_this_mod` and
+`from_source`. At least one `with_struct` or `with_enum` must present as well.
+
+##### `with_original_mod`
+
+Specifies the absolute path (starting with `crate::`) of the wrapper module,
+containing the original generated source code. The path is required because of
+some scoping limitations rust procedural macros have.
+
+Example:
+
+```rust,ignore
+prost_unwrap:include!(
+    with_original_mod(crate::generated)
+);
+```
+
+##### `with_this_mod`
+
+Specifies the absolute path of the wrapper module, containing the
+`prost-unwrap`-generated source code.
+
+```rust,ignore
+prost_unwrap:include!(
+    with_this_mod(crate::unwrapped)
+);
+```
+
+##### `from_source`
+
+Specifies the source code location along with the relative module path this code
+is wrapped in. The relative path must be the same within original code wrapper
+and the unwrapped code wrapper.
+
+In most cases this path will match the package name insode your proto file
+(`foo.bar` in our case) and the file name (`foo.bar.rs` in our case).
+
+```rust,ignore
+prost_unwrap:include!(
+    from_source(com::acme, ".proto/com.acme.rs")
+);
+```
+
+##### `with_struct`
+
+Specifies the struct relative path with the list of fields that need to be
+unwrapped from `Option<T>` into `T`.
+
+```rust,ignore
+prost_unwrap:include!(
+    with_struct(AcmeMessage, [field1, field2, field3])
+);
+```
+
+##### `with_enum`
+
+Specifies the enum relative path, that also needs to be included into the
+generated code (see "Known issues" section).
+
+```rust,ignore
+prost_unwrap:include!(
+    with_enum(AcmeEnum)
+);
+```
+
+### Generated code
+
+`prost-unwrap::include!` will generate the following pieces of code (along with
+the copied structs and enums):
+
+- The `Error` struct, implementing the `Debug`, `Display` and
+  `std::error::Error` traits.
+- Helper functions for converting original structs into copied structs, if
+  wrapped into `Option<T>` (optional fields) or `Vec<T>` (repeated fields).
+
+The copied structs and enums have prost-related attributes stripped:
+
+- `Message` derive for structs;
+- `Enumeration` derive for enums;
+- field-specific attributes for structs and enums.
+
+One can always inspect the generated code using the
+[cargo-expand](https://crates.io/crates/cargo-expand).
+
+### Features to be implemented
+
+- Partial copying: for now `prost-unwrap` copies all the structs and enums it
+  can find in the linked source code. It is possible to copy a subset of data
+  structures, if this subset is self-contained, meaning that members of the
+  subset only reference the members of the subset.
+
+- Item suffix: since the original and copied struct have the same name, the
+  structs need to be aliased somehow to have both of them in the same scope. By
+  implementing suffixes, it will be possible to automatically rename copied
+  structs.
+
+### Known issues
+
+- Useless `with_enum` options: since `prost-unwrap` copies all structs and
+  enums, this option is useless until partial copying is implemented.
+- Copied structs and enums lack `Debug` and `Default` trait implementations
+  (these are provided by prost `Message` and `Enumeration` derives, which are
+  stripped).
+- Tests do not cover all possible usage scenarios.
+
+### Contributing
+
+This crate is in early stages of development. If you encounter any surprising
+behavior, unclear documentation or other problem, please, feel free to create an
+issue on github.
+
+If you found a bug, please create a minimal reproducible scenario (proto file
+plus rust code) and put it into github issue.
+
+If you feel proficient in rust enough to criticize the source code
+inefficiencies, do the same.

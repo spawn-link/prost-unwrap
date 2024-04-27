@@ -1,0 +1,5 @@
+error: Parameter must have 2 arguments
+  --> tests/ui/with_struct_no_ident.rs:12:6
+   |
+12 |     .with_struct());
+   |      ^^^^^^^^^^^

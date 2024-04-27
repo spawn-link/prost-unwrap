@@ -1,0 +1,5 @@
+error: Parameter argument must be an ident literal, e.g. `Suffix`
+  --> tests/ui/with_suffix_invalid_ident.rs:13:18
+   |
+13 |     .with_suffix("Sane"));
+   |                  ^^^^^^

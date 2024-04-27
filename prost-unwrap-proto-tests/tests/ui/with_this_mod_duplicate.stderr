@@ -1,0 +1,5 @@
+error: Multiple `with_this_mod` parameters are not allowed
+  --> tests/ui/with_this_mod_duplicate.rs:11:6
+   |
+11 |     .with_this_mod(crate::test)
+   |      ^^^^^^^^^^^^^
