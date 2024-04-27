@@ -1,6 +1,6 @@
 [package]
 name = "prost-unwrap"
-version = "0.1.5"
+version = "1.0.0"
 edition = "2021"
 authors = ["Denis Farr <denis@spawnlink.eu>"]
 license = "Apache-2.0"
@@ -20,4 +20,4 @@ members = [
 exclude = ["prost-unwrap-proto-tests"]
 
 [dependencies]
-prost-unwrap-transform = { version = "0.1.5", path = "prost-unwrap-transform" }
+prost-unwrap-transform = { version = "1.0.0", path = "prost-unwrap-transform" }
