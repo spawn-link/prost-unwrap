@@ -334,14 +334,14 @@ dependencies = [
 
 [[package]]
 name = "prost-unwrap"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "prost-unwrap-transform",
 ]
 
 [[package]]
 name = "prost-unwrap-core"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "derive_builder",
  "proc-macro-error",
@@ -353,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "prost-unwrap-proto-tests"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "prost",
  "prost-build",
