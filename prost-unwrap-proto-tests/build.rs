@@ -22,8 +22,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .out_dir(".proto_out")
         .compile_protos(&[inner_proto], &[include_dir])?;
 
-    positive_test!("copy_no_modifications");
-    positive_test!("copy_unwrapped");
+    positive_test!("no_modifications");
+    positive_test!("nested_struct");
+    positive_test!("nested_enum");
+    positive_test!("repeated_struct");
+    positive_test!("repeated_enum");
+    positive_test!("repeated_scalar");
+    positive_test!("hashmap_of_structs");
+    positive_test!("hashmap_of_scalars");
 
     Ok(())
 }

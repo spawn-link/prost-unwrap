@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test;
+
+enum EnumA {
+  DEFAULT = 0;
+  NON_DEFAULT = 1;
+}
+message MsgB { EnumA f1 = 1; }
