@@ -1,6 +1,6 @@
 [package]
 name = "prost-unwrap-transform"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Denis Farr <denis@spawnlink.eu>"]
 license = "Apache-2.0"
@@ -15,4 +15,4 @@ proc-macro = true
 
 [dependencies]
 proc-macro-error = "1.0"
-prost-unwrap-core = { version = "1.0.0", path = "../prost-unwrap-core" }
+prost-unwrap-core = { version = "1.0.1", path = "../prost-unwrap-core" }

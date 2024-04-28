@@ -20,4 +20,4 @@ members = [
 exclude = ["prost-unwrap-proto-tests"]
 
 [dependencies]
-prost-unwrap-transform = { version = "1.0.0", path = "prost-unwrap-transform" }
+prost-unwrap-transform = { version = "1.0.1", path = "prost-unwrap-transform" }
