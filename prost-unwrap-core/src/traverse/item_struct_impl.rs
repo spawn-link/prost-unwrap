@@ -83,11 +83,17 @@ fn generate_try_from_original(
                     .to_string();
                 let is_required_field = required_fields.contains_key(&field_name);
                 let is_std_option_type = super::is_std_option_type(&field.ty);
-                let is_std_vec_type = super::is_std_vec_type(&field.ty);
+                let is_std_vec_non_scalar = super::is_std_vec_non_scalar(&field.ty);
+                let is_std_hashmap_non_scalar = super::is_std_hashmap_non_scalar(&field.ty);
 
-                match (is_required_field, is_std_option_type, is_std_vec_type) {
+                match (
+                    is_required_field,
+                    is_std_option_type,
+                    is_std_vec_non_scalar,
+                    is_std_hashmap_non_scalar,
+                ) {
                     // field is required, is an Option<T>, unwrap it
-                    (true, true, _) => {
+                    (true, true, _, _) => {
                         try_from_impl.push(
                             strfmt!(
                                 IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_UNWRAPPED,
@@ -98,7 +104,7 @@ fn generate_try_from_original(
                         );
                     }
                     // field is required, but is not an Option<T>, throw an error
-                    (true, false, _) => {
+                    (true, false, _, _) => {
                         let ty = &field.ty;
                         abort!(
                             required_fields.get(&field_name).unwrap(),
@@ -109,7 +115,7 @@ fn generate_try_from_original(
                         );
                     }
                     // field is not required, but is an Option<T>: convert with a function call
-                    (_, true, _) => {
+                    (_, true, _, _) => {
                         let convert_fn_typepath = config.this_item_typepath(vec![
                             super::items::FUNCTION_NAME_CONVERT_OPTION_TRY_FROM.to_string(),
                         ]);
@@ -122,8 +128,8 @@ fn generate_try_from_original(
                             .unwrap(),
                         );
                     }
-                    // field is not required, but is a Vec<T>: convert with a function call
-                    (_, _, true) => {
+                    // field is not required, but is a Vec<T> (non-scalar): convert with a function call
+                    (_, _, true, _) => {
                         let convert_fn_typepath = config.this_item_typepath(vec![
                             super::items::FUNCTION_NAME_CONVERT_VEC_TRY_FROM.to_string(),
                         ]);
@@ -136,8 +142,22 @@ fn generate_try_from_original(
                             .unwrap(),
                         );
                     }
+                    // field is not required, but is a HashMap<K, T> (T is non-scalar): convert with a function call
+                    (_, _, _, true) => {
+                        let convert_fn_typepath = config.this_item_typepath(vec![
+                            super::items::FUNCTION_NAME_CONVERT_HASHMAP_TRY_FROM.to_string(),
+                        ]);
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_CONVERTED,
+                                field_name => field_name,
+                                convert_function_path => quote!(#convert_fn_typepath).to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
                     // field is not required, not an Option<T> nor Vec<T>: pass as is
-                    (_, _, _) => {
+                    (_, _, _, _) => {
                         try_from_impl.push(
                             strfmt!(
                                 IMPL_BLOCK_TRY_FROM_ORIGINAL_FIELD_AS_IS,
@@ -211,11 +231,17 @@ fn generate_into_original(
                     .to_string();
                 let is_required_field = required_fields.contains_key(&field_name);
                 let is_std_option_type = super::is_std_option_type(&field.ty);
-                let is_std_vec_type = super::is_std_vec_type(&field.ty);
+                let is_std_vec_non_scalar = super::is_std_vec_non_scalar(&field.ty);
+                let is_std_hashmap_non_scalar = super::is_std_hashmap_non_scalar(&field.ty);
 
-                match (is_required_field, is_std_option_type, is_std_vec_type) {
+                match (
+                    is_required_field,
+                    is_std_option_type,
+                    is_std_vec_non_scalar,
+                    is_std_hashmap_non_scalar,
+                ) {
                     // field is required and is an Option<T>, wrap it into Some()
-                    (true, true, _) => {
+                    (true, true, _, _) => {
                         try_from_impl.push(
                             strfmt!(
                                 IMPL_BLOCK_INTO_ORIGINAL_FIELD_WRAPPED,
@@ -225,7 +251,7 @@ fn generate_into_original(
                         );
                     }
                     // field is required but is not an Option<T>, throw an error
-                    (true, false, _) => {
+                    (true, false, _, _) => {
                         let ty = &field.ty;
                         abort!(
                             required_fields.get(&field_name).unwrap(),
@@ -236,7 +262,7 @@ fn generate_into_original(
                         );
                     }
                     // field is not required but is an Option<T>, convert it with a function call
-                    (_, true, _) => {
+                    (_, true, _, _) => {
                         let convert_fn_typepath = config.this_item_typepath(vec![
                             super::items::FUNCTION_NAME_CONVERT_OPTION_INTO.to_string(),
                         ]);
@@ -249,8 +275,8 @@ fn generate_into_original(
                             .unwrap(),
                         );
                     }
-                    // field is not required but is a Vec<T>, convert it with a function call
-                    (_, _, true) => {
+                    // field is not required but is a Vec<T> (non-scalar), convert it with a function call
+                    (_, _, true, _) => {
                         let convert_fn_typepath = config.this_item_typepath(vec![
                             super::items::FUNCTION_NAME_CONVERT_VEC_INTO.to_string(),
                         ]);
@@ -263,8 +289,22 @@ fn generate_into_original(
                             .unwrap(),
                         );
                     }
+                    // field is not required but is a HashMap<K, T> (T is non-scalar), convert it with a function call
+                    (_, _, _, true) => {
+                        let convert_fn_typepath = config.this_item_typepath(vec![
+                            super::items::FUNCTION_NAME_CONVERT_HASHMAP_INTO.to_string(),
+                        ]);
+                        try_from_impl.push(
+                            strfmt!(
+                                IMPL_BLOCK_INTO_ORIGINAL_FIELD_CONVERTED,
+                                field_name => field_name,
+                                convert_function_path => quote!(#convert_fn_typepath).to_string()
+                            )
+                            .unwrap(),
+                        );
+                    }
                     // field is not required, not an Option<T> nor Vec<T>, pass as is
-                    (_, _, _) => {
+                    (_, _, _, _) => {
                         try_from_impl.push(
                             strfmt!(
                                 IMPL_BLOCK_INTO_ORIGINAL_FIELD_AS_IS,

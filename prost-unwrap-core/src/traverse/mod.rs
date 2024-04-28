@@ -3,6 +3,7 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::Attribute;
 use syn::File;
+use syn::GenericArgument;
 use syn::Item;
 use syn::Meta;
 use syn::PathArguments;
@@ -29,9 +30,11 @@ pub(crate) fn copy_unwrapped(config: &Config) -> File {
 
     items.extend(items::item_error());
     items.extend(items::item_convert_option_try_from());
-    items.extend(items::item_convert_vec_try_from());
     items.extend(items::item_convert_option_into());
+    items.extend(items::item_convert_vec_try_from());
     items.extend(items::item_convert_vec_into());
+    items.extend(items::item_convert_hashmap_try_from());
+    items.extend(items::item_convert_hashmap_into());
     items.extend(copy_unwrapped_items(config, &mut ident_stack, &ast.items));
 
     File {
@@ -154,6 +157,64 @@ pub(crate) fn is_std_vec_type(ty: &Type) -> bool {
     false
 }
 
+// the functions for detecting non-scalar vecs and hashmaps are hacky; the
+// proper types handling will follow during the partial copying implementation.
+const SCALAR_TYPES: [&str; 15] = [
+    "f64", "f32", "i32", "i64", "u32", "u64", "i32", "i64", "u8", "u32", "u64", "i32", "i64",
+    "bool", "String",
+];
+
+pub(crate) fn is_std_vec_non_scalar(ty: &Type) -> bool {
+    if let Type::Path(ty_path) = ty {
+        return ty_path.path.segments.last().map_or(false, |segment| {
+            if segment.ident == "Vec" && !segment.arguments.is_empty() {
+                if let PathArguments::AngleBracketed(ref args) = segment.arguments {
+                    if let Some(GenericArgument::Type(Type::Path(ref ty_path))) = args.args.first()
+                    {
+                        return !SCALAR_TYPES.contains(
+                            &ty_path
+                                .path
+                                .segments
+                                .last()
+                                .unwrap()
+                                .ident
+                                .to_string()
+                                .as_str(),
+                        );
+                    }
+                }
+            }
+            false
+        });
+    }
+    false
+}
+
+pub(crate) fn is_std_hashmap_non_scalar(ty: &Type) -> bool {
+    if let Type::Path(ty_path) = ty {
+        return ty_path.path.segments.last().map_or(false, |segment| {
+            if segment.ident == "HashMap" && !segment.arguments.is_empty() {
+                if let PathArguments::AngleBracketed(ref args) = segment.arguments {
+                    if let Some(GenericArgument::Type(Type::Path(ref ty_path))) = args.args.last() {
+                        return !SCALAR_TYPES.contains(
+                            &ty_path
+                                .path
+                                .segments
+                                .last()
+                                .unwrap()
+                                .ident
+                                .to_string()
+                                .as_str(),
+                        );
+                    }
+                }
+            }
+            false
+        });
+    }
+    false
+}
+
 pub(crate) mod items {
     use syn::Item;
     use syn::ItemImpl;
@@ -167,7 +228,8 @@ pub(crate) mod items {
                 pub reason: &'static str,
             }
         "#;
-        let item_def_block: ItemStruct = syn::parse_str(DEF_BLOCK).unwrap();
+        let item_def_block: ItemStruct =
+            syn::parse_str(DEF_BLOCK).expect("Expected Error definition");
 
         const IMPL_BLOCK_DISPLAY: &str = r#"
             impl std::fmt::Display for Error {
@@ -176,12 +238,14 @@ pub(crate) mod items {
                 }
             }
         "#;
-        let item_impl_block_display: ItemImpl = syn::parse_str(IMPL_BLOCK_DISPLAY).unwrap();
+        let item_impl_block_display: ItemImpl =
+            syn::parse_str(IMPL_BLOCK_DISPLAY).expect("Expected impl Display for Error");
 
         const IMPL_BLOCK_STD_ERROR: &str = r#"
             impl std::error::Error for Error {}
         "#;
-        let item_impl_block_error: ItemImpl = syn::parse_str(IMPL_BLOCK_STD_ERROR).unwrap();
+        let item_impl_block_error: ItemImpl = syn::parse_str(IMPL_BLOCK_STD_ERROR)
+            .expect("Expected impl std::error::Error for Error");
 
         vec![
             Item::Struct(item_def_block),
@@ -193,7 +257,7 @@ pub(crate) mod items {
     pub const FUNCTION_NAME_CONVERT_OPTION_TRY_FROM: &str = "convert_option_try_from";
     pub(crate) fn item_convert_option_try_from() -> Vec<Item> {
         const DEF_BLOCK: &str = r#"
-            fn convert_option_try_from<U, T>(option: Option<U>) -> Result<Option<T>, T::Error>
+            pub fn convert_option_try_from<U, T>(option: Option<U>) -> Result<Option<T>, T::Error>
             where
                 T: TryFrom<U>,
             {
@@ -203,28 +267,30 @@ pub(crate) mod items {
                 }
             }
         "#;
-        let item_def_block: Item = syn::parse_str(DEF_BLOCK).unwrap();
+        let item_def_block: Item =
+            syn::parse_str(DEF_BLOCK).expect("Expected item_convert_option_try_from definition");
         vec![item_def_block]
     }
 
     pub const FUNCTION_NAME_CONVERT_OPTION_INTO: &str = "convert_option_into";
     pub(crate) fn item_convert_option_into() -> Vec<Item> {
         const DEF_BLOCK: &str = r#"
-            fn convert_option_into<T, U>(option: Option<T>) -> Option<U>
+            pub fn convert_option_into<T, U>(option: Option<T>) -> Option<U>
             where
                 T: Into<U>,
             {
                 option.map(Into::into)
             }
         "#;
-        let item_def_block: Item = syn::parse_str(DEF_BLOCK).unwrap();
+        let item_def_block: Item =
+            syn::parse_str(DEF_BLOCK).expect("Expected item_convert_option_into definition");
         vec![item_def_block]
     }
 
     pub const FUNCTION_NAME_CONVERT_VEC_TRY_FROM: &str = "convert_vec_try_from";
     pub(crate) fn item_convert_vec_try_from() -> Vec<Item> {
         const DEF_BLOCK: &str = r#"
-            fn convert_vec_try_from<T, U>(input_vec: Vec<T>) -> Result<Vec<U>, U::Error>
+            pub fn convert_vec_try_from<T, U>(input_vec: Vec<T>) -> Result<Vec<U>, U::Error>
             where
                 U: TryFrom<T>,
             {
@@ -238,21 +304,69 @@ pub(crate) mod items {
                 Ok(output_vec)
             }
         "#;
-        let item_def_block: Item = syn::parse_str(DEF_BLOCK).unwrap();
+        let item_def_block: Item =
+            syn::parse_str(DEF_BLOCK).expect("Expected item_convert_vec_try_from definition");
         vec![item_def_block]
     }
 
     pub const FUNCTION_NAME_CONVERT_VEC_INTO: &str = "convert_vec_into";
     pub(crate) fn item_convert_vec_into() -> Vec<Item> {
         const DEF_BLOCK: &str = r#"
-            fn convert_vec_into<T, U>(input_vec: Vec<T>) -> Vec<U>
+            pub fn convert_vec_into<T, U>(input_vec: Vec<T>) -> Vec<U>
             where
                 T: Into<U>,
             {
                 input_vec.into_iter().map(Into::into).collect()
             }
         "#;
-        let item_def_block: Item = syn::parse_str(DEF_BLOCK).unwrap();
+        let item_def_block: Item =
+            syn::parse_str(DEF_BLOCK).expect("Expected item_convert_vec_into definition");
+        vec![item_def_block]
+    }
+
+    pub const FUNCTION_NAME_CONVERT_HASHMAP_TRY_FROM: &str = "convert_hashmap_try_from";
+    pub(crate) fn item_convert_hashmap_try_from() -> Vec<Item> {
+        const DEF_BLOCK: &str = r#"
+            pub fn convert_hashmap_try_from<K, T, U>(
+                input_map: std::collections::HashMap<K, T>,
+            ) -> Result<std::collections::HashMap<K, U>, U::Error>
+            where
+                U: TryFrom<T>,
+                K: std::cmp::Eq + std::hash::Hash,
+            {
+                let mut output_map = std::collections::HashMap::with_capacity(input_map.len());
+                for (key, value) in input_map {
+                    let converted_value = U::try_from(value)?;
+                    output_map.insert(key, converted_value);
+                }
+                Ok(output_map)
+            }
+        "#;
+        let item_def_block: Item =
+            syn::parse_str(DEF_BLOCK).expect("Expected item_convert_hashmap_try_from definition");
+        vec![item_def_block]
+    }
+
+    pub const FUNCTION_NAME_CONVERT_HASHMAP_INTO: &str = "convert_hashmap_into";
+    pub(crate) fn item_convert_hashmap_into() -> Vec<Item> {
+        const DEF_BLOCK: &str = r#"
+            pub fn convert_hashmap_into<K, T, U>(
+                input_map: std::collections::HashMap<K, T>,
+            ) -> std::collections::HashMap<K, U>
+            where
+                T: Into<U>,
+                K: std::cmp::Eq + std::hash::Hash,
+            {
+                let mut output_map = std::collections::HashMap::with_capacity(input_map.len());
+                for (key, value) in input_map {
+                    let converted_value = value.into();
+                    output_map.insert(key, converted_value);
+                }
+                output_map
+            }
+        "#;
+        let item_def_block: Item =
+            syn::parse_str(DEF_BLOCK).expect("Expected item_convert_hashmap_into definition");
         vec![item_def_block]
     }
 }
