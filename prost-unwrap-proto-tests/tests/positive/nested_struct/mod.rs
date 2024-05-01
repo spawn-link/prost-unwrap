@@ -19,7 +19,23 @@ pub mod sane {
 #[test]
 fn test_conversion() {
     let orig = generated::test::MsgB {
-        f1: Some(generated::test::MsgA { f1: 0 }),
+        f1: Some(generated::test::MsgA {
+            f1: 0.0,
+            f2: 0.0,
+            f3: 0,
+            f4: 0,
+            f5: 0,
+            f6: 0,
+            f7: 0,
+            f8: 0,
+            f9: 0,
+            f10: 0,
+            f11: 0,
+            f12: 0,
+            f13: false,
+            f14: "foo".to_string(),
+            f15: vec![0, 1, 2, 3, 4, 5],
+        }),
     };
     let sane: sane::test::MsgB = orig.clone().try_into().unwrap();
     assert_eq!(orig, Into::<generated::test::MsgB>::into(sane));

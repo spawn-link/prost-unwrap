@@ -1,9 +1,11 @@
 use quote::quote;
 use strfmt::strfmt;
+use syn::Field;
 use syn::Fields;
 use syn::Item;
 use syn::ItemEnum;
 use syn::ItemImpl;
+use syn::Type;
 
 use crate::include::Config;
 use crate::Traverse;
@@ -51,22 +53,40 @@ fn generate_try_from_original(
     .unwrap();
 
     for variant in &item.variants {
-        if variant.fields.is_empty() {
+        if let Some(Field {
+            ty: Type::Path(ref ty_path),
+            ..
+        }) = variant.fields.iter().next()
+        {
+            if super::is_type_non_scalar(ty_path) {
+                try_from_impl_str += &strfmt!(
+                    IMPL_BLOCK_TRY_FROM_VARIANT_CONTENT,
+                    variant_name => variant.ident.to_string(),
+                    item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
+                    fields => variant_fields_as_string(&variant.fields, ""),
+                    fields_into => variant_fields_as_string(&variant.fields, ".try_into()?")
+                )
+                .unwrap();
+            } else {
+                try_from_impl_str += &strfmt!(
+                    IMPL_BLOCK_TRY_FROM_VARIANT_CONTENT,
+                    variant_name => variant.ident.to_string(),
+                    item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
+                    fields => variant_fields_as_string(&variant.fields, ""),
+                    fields_into => variant_fields_as_string(&variant.fields, "")
+                )
+                .unwrap();
+            }
+        } else {
             try_from_impl_str += &strfmt!(
                 IMPL_BLOCK_TRY_FROM_VARIANT_NO_CONTENT,
                 variant_name => variant.ident.to_string(),
                 item_enum_ty_path => quote!(#orig_item_typepath).to_string()
             )
             .unwrap();
+        }
+        if variant.fields.is_empty() {
         } else {
-            try_from_impl_str += &strfmt!(
-                IMPL_BLOCK_TRY_FROM_VARIANT_CONTENT,
-                variant_name => variant.ident.to_string(),
-                item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
-                fields => variant_fields_as_string(&variant.fields, ""),
-                fields_into => variant_fields_as_string(&variant.fields, ".try_into()?")
-            )
-            .unwrap();
         }
     }
 
@@ -102,20 +122,35 @@ fn generate_into_original(
     .unwrap();
 
     for variant in &item.variants {
-        if variant.fields.is_empty() {
+        if let Some(Field {
+            ty: Type::Path(ref ty_path),
+            ..
+        }) = variant.fields.iter().next()
+        {
+            if super::is_type_non_scalar(ty_path) {
+                try_from_impl_str += &strfmt!(
+                    IMPL_BLOCK_INTO_VARIANT_CONTENT,
+                    variant_name => variant.ident.to_string(),
+                    item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
+                    fields => variant_fields_as_string(&variant.fields, ""),
+                    fields_into => variant_fields_as_string(&variant.fields, ".into()")
+                )
+                .unwrap();
+            } else {
+                try_from_impl_str += &strfmt!(
+                    IMPL_BLOCK_INTO_VARIANT_CONTENT,
+                    variant_name => variant.ident.to_string(),
+                    item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
+                    fields => variant_fields_as_string(&variant.fields, ""),
+                    fields_into => variant_fields_as_string(&variant.fields, "")
+                )
+                .unwrap();
+            }
+        } else {
             try_from_impl_str += &strfmt!(
                 IMPL_BLOCK_INTO_VARIANT_NO_CONTENT,
                 variant_name => variant.ident.to_string(),
                 item_enum_ty_path => quote!(#orig_item_typepath).to_string()
-            )
-            .unwrap();
-        } else {
-            try_from_impl_str += &strfmt!(
-                IMPL_BLOCK_INTO_VARIANT_CONTENT,
-                variant_name => variant.ident.to_string(),
-                item_enum_ty_path => quote!(#orig_item_typepath).to_string(),
-                fields => variant_fields_as_string(&variant.fields, ""),
-                fields_into => variant_fields_as_string(&variant.fields, ".into()")
             )
             .unwrap();
         }

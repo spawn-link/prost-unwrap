@@ -30,6 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     positive_test!("repeated_scalar");
     positive_test!("hashmap_of_structs");
     positive_test!("hashmap_of_scalars");
+    positive_test!("oneof_scalars");
+    positive_test!("oneof_structs");
+    positive_test!("oneof_enums");
 
     Ok(())
 }

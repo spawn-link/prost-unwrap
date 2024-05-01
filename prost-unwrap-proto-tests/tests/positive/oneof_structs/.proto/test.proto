@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package test;
+
+message MsgA1 {
+  double f1 = 1;
+  float f2 = 2;
+  int32 f3 = 3;
+  int64 f4 = 4;
+  uint32 f5 = 5;
+  uint64 f6 = 6;
+  sint32 f7 = 7;
+  sint64 f8 = 8;
+  fixed32 f9 = 9;
+  fixed64 f10 = 10;
+  sfixed32 f11 = 11;
+  sfixed64 f12 = 12;
+  bool f13 = 13;
+  string f14 = 14;
+  bytes f15 = 15;
+}
+message MsgA2 {
+  double f1 = 1;
+  float f2 = 2;
+  int32 f3 = 3;
+  int64 f4 = 4;
+  uint32 f5 = 5;
+  uint64 f6 = 6;
+  sint32 f7 = 7;
+  sint64 f8 = 8;
+  fixed32 f9 = 9;
+  fixed64 f10 = 10;
+  sfixed32 f11 = 11;
+  sfixed64 f12 = 12;
+  bool f13 = 13;
+  string f14 = 14;
+  bytes f15 = 15;
+}
+
+message MsgB {
+  oneof f0 {
+    MsgA1 f1 = 1;
+    MsgA2 f2 = 2;
+  }
+}

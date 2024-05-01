@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test;
+
+enum EnumA1 {
+  DEFAULT = 0;
+  NON_DEFAULT = 1;
+}
+
+message MsgB {
+  oneof f0 {
+    EnumA1 f1 = 1;
+    int32 f2 = 2;
+  }
+}

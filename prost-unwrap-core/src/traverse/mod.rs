@@ -9,6 +9,7 @@ use syn::Meta;
 use syn::PathArguments;
 use syn::Token;
 use syn::Type;
+use syn::TypePath;
 
 use crate::include::Config;
 
@@ -157,11 +158,14 @@ pub(crate) fn is_std_vec_type(ty: &Type) -> bool {
     false
 }
 
-// the functions for detecting non-scalar vecs and hashmaps are hacky; the
-// proper types handling will follow during the partial copying implementation.
-const SCALAR_TYPES: [&str; 15] = [
+// the functions for detecting non-scalar types are hacky; the proper types
+// handling will follow during the partial copying implementation.
+// Note: `Vec` is here to handle Vec<Vec<u8>> which corresponds to repeated
+// bytes type in protobuf definition. No other protobuf type may be mapped into
+// Vec<Vec<T>>.
+const SCALAR_TYPES: [&str; 16] = [
     "f64", "f32", "i32", "i64", "u32", "u64", "i32", "i64", "u8", "u32", "u64", "i32", "i64",
-    "bool", "String",
+    "bool", "String", "Vec",
 ];
 
 pub(crate) fn is_std_vec_non_scalar(ty: &Type) -> bool {
@@ -171,16 +175,7 @@ pub(crate) fn is_std_vec_non_scalar(ty: &Type) -> bool {
                 if let PathArguments::AngleBracketed(ref args) = segment.arguments {
                     if let Some(GenericArgument::Type(Type::Path(ref ty_path))) = args.args.first()
                     {
-                        return !SCALAR_TYPES.contains(
-                            &ty_path
-                                .path
-                                .segments
-                                .last()
-                                .unwrap()
-                                .ident
-                                .to_string()
-                                .as_str(),
-                        );
+                        return is_type_non_scalar(ty_path);
                     }
                 }
             }
@@ -196,16 +191,7 @@ pub(crate) fn is_std_hashmap_non_scalar(ty: &Type) -> bool {
             if segment.ident == "HashMap" && !segment.arguments.is_empty() {
                 if let PathArguments::AngleBracketed(ref args) = segment.arguments {
                     if let Some(GenericArgument::Type(Type::Path(ref ty_path))) = args.args.last() {
-                        return !SCALAR_TYPES.contains(
-                            &ty_path
-                                .path
-                                .segments
-                                .last()
-                                .unwrap()
-                                .ident
-                                .to_string()
-                                .as_str(),
-                        );
+                        return is_type_non_scalar(ty_path);
                     }
                 }
             }
@@ -213,6 +199,19 @@ pub(crate) fn is_std_hashmap_non_scalar(ty: &Type) -> bool {
         });
     }
     false
+}
+
+pub(crate) fn is_type_non_scalar(ty_path: &TypePath) -> bool {
+    !SCALAR_TYPES.contains(
+        &ty_path
+            .path
+            .segments
+            .last()
+            .unwrap()
+            .ident
+            .to_string()
+            .as_str(),
+    )
 }
 
 pub(crate) mod items {
